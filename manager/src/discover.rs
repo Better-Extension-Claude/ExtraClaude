@@ -20,6 +20,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub struct Asset {
     pub id: u64,
     pub name: String,
+    /// Lien de téléchargement direct (github.com) : pas compté dans la limite de l'API.
+    pub url: String,
 }
 
 /// Extension publiée : manifeste de sa dernière release, et le jeton qui l'ouvre (privée).
@@ -46,8 +48,13 @@ fn get(path: &str, token: Option<&str>) -> Result<Value, String> {
     github::get(path, token)
 }
 
-fn asset(repo: &str, id: u64, token: Option<&str>) -> Result<Vec<u8>, String> {
-    let url = format!("https://api.github.com/repos/{repo}/releases/assets/{id}");
+/// Fichier d'une release. Sans compte (dépôt public) : par le lien direct, que la limite de
+/// 60 requêtes par heure de l'API sans compte ne bloque pas.
+fn asset(repo: &str, file: &Asset, token: Option<&str>) -> Result<Vec<u8>, String> {
+    if token.is_none() && !file.url.is_empty() {
+        return github::request("GET", &file.url, None, None, "application/octet-stream");
+    }
+    let url = format!("https://api.github.com/repos/{repo}/releases/assets/{}", file.id);
     github::request("GET", &url, None, token, "application/octet-stream")
 }
 
@@ -65,30 +72,37 @@ fn ours(list: &Value) -> Vec<(String, bool)> {
         .collect()
 }
 
-/// Dépôts visibles : publics sans compte, puis ceux du compte connecté (privés compris),
-/// chacun avec le jeton qui l'ouvre.
+/// Dépôts visibles : les publics, puis ceux du compte connecté (privés compris), chacun avec
+/// le jeton qui l'ouvre. Un compte connecté sert aussi pour les publics : sans compte, GitHub
+/// limite à 60 requêtes par heure, vite atteintes.
 fn repos() -> Result<BTreeMap<String, (bool, Option<String>)>, String> {
     let mut repos = BTreeMap::new();
     let mut any = false;
     let mut last_error = None;
+    let tokens: Vec<String> = Session::load().map(|s| s.token).into_iter().chain(gh_token()).collect();
     for owner in github::owners() {
-        match get(&format!("users/{owner}/repos?per_page=100"), None) {
-            Ok(list) => {
-                any = true;
-                for (name, private) in ours(&list) {
-                    repos.insert(name, (private, None));
+        // Avec le premier jeton qui marche, sinon sans compte.
+        let attempts = tokens.iter().map(|t| Some(t.as_str())).chain(std::iter::once(None));
+        for token in attempts {
+            match get(&format!("users/{owner}/repos?per_page=100"), token) {
+                Ok(list) => {
+                    any = true;
+                    for (name, private) in ours(&list) {
+                        repos.insert(name, (private, token.map(str::to_string)));
+                    }
+                    break;
                 }
+                Err(e) => last_error = Some(e),
             }
-            Err(e) => last_error = Some(e),
         }
     }
-    let tokens = Session::load().map(|s| s.token).into_iter().chain(gh_token());
-    for token in tokens {
-        if let Ok(list) = get("user/repos?per_page=100&affiliation=owner,collaborator,organization_member", Some(&token)) {
+    for token in &tokens {
+        if let Ok(list) = get("user/repos?per_page=100&affiliation=owner,collaborator,organization_member", Some(token)) {
             any = true;
             for (name, private) in ours(&list) {
                 let entry = repos.entry(name).or_insert((private, None));
-                if entry.1.is_none() && private {
+                if entry.1.is_none() || private && !entry.0 {
+                    entry.0 = private;
                     entry.1 = Some(token.clone());
                 }
             }
@@ -110,10 +124,16 @@ pub fn fetch() -> Result<Vec<Remote>, String> {
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .filter_map(|a| Some(Asset { id: a.get("id")?.as_u64()?, name: a.get("name")?.as_str()?.to_string() }))
+            .filter_map(|a| {
+                Some(Asset {
+                    id: a.get("id")?.as_u64()?,
+                    name: a.get("name")?.as_str()?.to_string(),
+                    url: a.get("browser_download_url").and_then(Value::as_str).unwrap_or_default().to_string(),
+                })
+            })
             .collect();
         let Some(json) = assets.iter().find(|a| a.name == "extension.json") else { continue };
-        let Ok(bytes) = asset(&repo, json.id, token.as_deref()) else { continue };
+        let Ok(bytes) = asset(&repo, json, token.as_deref()) else { continue };
         let text = String::from_utf8_lossy(&bytes);
         let Ok(manifest) = serde_json::from_str::<Manifest>(text.trim_start_matches('\u{feff}')) else { continue };
         let tag = release.get("tag_name").and_then(Value::as_str).unwrap_or_default();
@@ -139,7 +159,7 @@ pub fn install(remote: &Remote) -> Result<Manifest, String> {
         if file.name.contains('/') || file.name.contains('\\') || file.name.starts_with('.') {
             continue;
         }
-        let bytes = asset(&remote.repo, file.id, remote.token.as_deref())?;
+        let bytes = asset(&remote.repo, file, remote.token.as_deref())?;
         std::fs::write(staging.join(&file.name), bytes).map_err(|e| e.to_string())?;
     }
     let dest = extensions_dir().join(betterext::folder_name(&remote.manifest));
