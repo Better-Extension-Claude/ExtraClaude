@@ -1,0 +1,19 @@
+[package]
+name = "betterext-manager"
+version = "0.1.0"
+edition = "2021"
+description = "Gestionnaire d'extensions de Claude : un seul hook, les extensions activées démarrent seules"
+
+[[bin]]
+name = "BetterClaude"
+path = "src/main.rs"
+
+[dependencies]
+betterext = { path = "../sdk" }
+eframe = { version = "0.29.1", default-features = false, features = ["glow", "default_fonts"] }
+rfd = { version = "0.15", default-features = false }
+raw-window-handle = "0.6"
+serde = { workspace = true }
+serde_json = { workspace = true }
+windows-sys = { workspace = true }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Accessibility"] }

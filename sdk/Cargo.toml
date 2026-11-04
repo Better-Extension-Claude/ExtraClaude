@@ -1,0 +1,10 @@
+[package]
+name = "betterext"
+version = "0.1.0"
+edition = "2021"
+description = "Contrat entre BetterExt et ses extensions : manifeste, état, événements de Claude, fenêtre de Claude"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+windows-sys = { workspace = true }
