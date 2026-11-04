@@ -1,0 +1,20 @@
+[
+  {
+    "repo": "Better-Extension-Claude/GitPush",
+    "id": "gitpush",
+    "name": "GitPush",
+    "description": "Envoyez votre projet sur GitHub en un clic, sans passer par Claude."
+  },
+  {
+    "repo": "Better-Extension-Claude/cmd-buddy",
+    "id": "cmd-buddy",
+    "name": "CMD Buddy",
+    "description": "Un compagnon pour retrouver vos commandes plus vite et garder vos favorites sous la main."
+  },
+  {
+    "repo": "Better-Extension-Claude/download-progress",
+    "id": "download-progress",
+    "name": "Download Progress",
+    "description": "Suivez l'avancée de vos téléchargements directement dans la discussion."
+  }
+]
