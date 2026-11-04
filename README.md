@@ -117,4 +117,9 @@ BetterClaude.exe --add dist\extension.json
 Un dépôt dans l'organisation `Better-Extension-Claude`, avec une **release** dont les
 fichiers sont `extension.json` et l'exe (plus ce dont l'extension a besoin). L'onglet
 Découverte la trouve grâce à `extension.json`, et l'installation copie tous les fichiers
-de la release. `BetterClaude.exe --discover` affiche ce que voit l'onglet Découverte.
+de la release.
+
+Ajoutez ensuite le dépôt à [`catalogue.json`](catalogue.json) : c'est la liste de l'onglet
+Découverte. Une extension privée peut y figurer : les comptes qui n'y ont pas accès la
+voient, mais ne peuvent pas l'installer. `BetterClaude.exe --discover` affiche ce que voit
+l'onglet Découverte.

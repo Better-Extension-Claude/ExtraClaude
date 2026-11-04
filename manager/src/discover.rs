@@ -1,20 +1,28 @@
-//! Découverte : les extensions publiées sur GitHub (organisation des extensions et compte
-//! du propriétaire). Un dépôt est une extension quand sa dernière release contient
-//! `extension.json` ; installer copie tous les fichiers de la release dans `extensions\<id>\`.
+//! Découverte : les extensions publiées sur GitHub.
 //!
-//! Les dépôts publics se voient sans rien. Les privés se voient avec le compte GitHub
-//! connecté dans BetterClaude, s'il y a accès (GitHub CLI connecté compte aussi).
+//! La liste vient du **catalogue** (`catalogue.json` du dépôt BetterClaude) : chaque extension
+//! y est donnée par son dépôt. Une seule requête, hors de l'API GitHub (pas de limite), puis
+//! chaque dépôt est lu **en même temps** que les autres :
+//! - public : `extension.json` de la dernière release par le lien direct, sans compte ;
+//! - privé : par l'API, avec le compte GitHub connecté (ou GitHub CLI). Sans accès,
+//!   l'extension reste affichée (nom et description du catalogue) mais ne s'installe pas.
+//!
+//! Avec un compte connecté, ses dépôts dans l'organisation s'ajoutent à la liste (une
+//! extension pas encore au catalogue). Installer copie tous les fichiers de la release.
 
 use crate::github::{self, Session};
 use betterext::{extensions_dir, process, Manifest};
+use serde::Deserialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Catalogue des extensions, lu sans passer par l'API GitHub.
+const CATALOGUE: &str = "https://raw.githubusercontent.com/Better-Extension-Claude/BetterClaude/main/catalogue.json";
 
 #[derive(Clone)]
 pub struct Asset {
@@ -29,10 +37,25 @@ pub struct Asset {
 pub struct Remote {
     pub repo: String,
     pub private: bool,
+    /// Faux : dépôt privé auquel le compte n'a pas accès (manifeste tiré du catalogue).
+    pub access: bool,
     pub manifest: Manifest,
     pub version: String,
+    /// Vide pour un dépôt public lu sans l'API : la liste est lue à l'installation.
     pub assets: Vec<Asset>,
     token: Option<String>,
+}
+
+/// Entrée du catalogue.
+#[derive(Clone, Deserialize)]
+struct Entry {
+    repo: String,
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
 }
 
 /// Jeton de GitHub CLI, s'il est installé et connecté (facultatif).
@@ -42,6 +65,12 @@ fn gh_token() -> Option<String> {
     let out = Command::new(gh).args(["auth", "token"]).creation_flags(CREATE_NO_WINDOW).output().ok()?;
     let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
     (out.status.success() && !token.is_empty()).then_some(token)
+}
+
+fn tokens() -> Vec<String> {
+    let mut list: Vec<String> = Session::load().map(|s| s.token).into_iter().chain(gh_token()).collect();
+    list.dedup();
+    list
 }
 
 fn get(path: &str, token: Option<&str>) -> Result<Value, String> {
@@ -58,95 +87,135 @@ fn asset(repo: &str, file: &Asset, token: Option<&str>) -> Result<Vec<u8>, Strin
     github::request("GET", &url, None, token, "application/octet-stream")
 }
 
-/// (dépôt, privé) d'une liste de dépôts GitHub, limitée aux comptes lus par Découverte.
-fn ours(list: &Value) -> Vec<(String, bool)> {
-    let owners = github::owners();
-    list.as_array()
-        .into_iter()
-        .flatten()
-        .filter(|r| {
-            let owner = r.pointer("/owner/login").and_then(Value::as_str).unwrap_or_default();
-            owners.iter().any(|o| o.eq_ignore_ascii_case(owner)) && !r.get("archived").and_then(Value::as_bool).unwrap_or(false)
-        })
-        .filter_map(|r| Some((r.get("full_name")?.as_str()?.to_string(), r.get("private").and_then(Value::as_bool).unwrap_or(false))))
-        .collect()
+fn parse_manifest(bytes: &[u8]) -> Option<Manifest> {
+    serde_json::from_str(String::from_utf8_lossy(bytes).trim_start_matches('\u{feff}')).ok()
 }
 
-/// Dépôts visibles : les publics, puis ceux du compte connecté (privés compris), chacun avec
-/// le jeton qui l'ouvre. Un compte connecté sert aussi pour les publics : sans compte, GitHub
-/// limite à 60 requêtes par heure, vite atteintes.
-fn repos() -> Result<BTreeMap<String, (bool, Option<String>)>, String> {
-    let mut repos = BTreeMap::new();
-    let mut any = false;
-    let mut last_error = None;
-    let tokens: Vec<String> = Session::load().map(|s| s.token).into_iter().chain(gh_token()).collect();
-    for owner in github::owners() {
-        // Avec le premier jeton qui marche, sinon sans compte.
-        let attempts = tokens.iter().map(|t| Some(t.as_str())).chain(std::iter::once(None));
-        for token in attempts {
-            match get(&format!("users/{owner}/repos?per_page=100"), token) {
-                Ok(list) => {
-                    any = true;
-                    for (name, private) in ours(&list) {
-                        repos.insert(name, (private, token.map(str::to_string)));
-                    }
-                    break;
-                }
-                Err(e) => last_error = Some(e),
-            }
-        }
+/// Fichiers de la dernière release, par l'API, et sa version (tag sans « v »).
+fn release_assets(repo: &str, token: Option<&str>) -> Result<(Vec<Asset>, String), String> {
+    let release = get(&format!("repos/{repo}/releases/latest"), token)?;
+    let assets = release
+        .get("assets")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|a| {
+            Some(Asset {
+                id: a.get("id")?.as_u64()?,
+                name: a.get("name")?.as_str()?.to_string(),
+                url: a.get("browser_download_url").and_then(Value::as_str).unwrap_or_default().to_string(),
+            })
+        })
+        .collect();
+    let tag = release.get("tag_name").and_then(Value::as_str).unwrap_or_default().trim_start_matches('v').to_string();
+    Ok((assets, tag))
+}
+
+/// Lit une extension : d'abord comme dépôt public (lien direct), sinon avec chaque jeton.
+fn read(entry: &Entry, tokens: &[String]) -> Option<Remote> {
+    let repo = entry.repo.clone();
+    let direct = format!("https://github.com/{repo}/releases/latest/download/extension.json");
+    if let Some(manifest) = github::request("GET", &direct, None, None, "application/octet-stream").ok().and_then(|b| parse_manifest(&b)) {
+        let version = manifest.version.clone().unwrap_or_default();
+        return Some(Remote { repo, private: false, access: true, manifest, version, assets: Vec::new(), token: None });
     }
-    for token in &tokens {
-        if let Ok(list) = get("user/repos?per_page=100&affiliation=owner,collaborator,organization_member", Some(token)) {
-            any = true;
-            for (name, private) in ours(&list) {
-                let entry = repos.entry(name).or_insert((private, None));
-                if entry.1.is_none() || private && !entry.0 {
-                    entry.0 = private;
-                    entry.1 = Some(token.clone());
-                }
-            }
-        }
+    for token in tokens {
+        let Ok((assets, tag)) = release_assets(&repo, Some(token)) else { continue };
+        let json = assets.iter().find(|a| a.name == "extension.json")?;
+        let manifest = asset(&repo, json, Some(token)).ok().and_then(|b| parse_manifest(&b))?;
+        let version = manifest.version.clone().unwrap_or(tag);
+        return Some(Remote { repo, private: true, access: true, manifest, version, assets, token: Some(token.clone()) });
     }
-    if !any {
-        return Err(last_error.unwrap_or_else(|| "GitHub injoignable.".into()));
+    // Privée sans accès : ce que dit le catalogue.
+    if entry.name.is_empty() {
+        return None;
     }
-    Ok(repos)
+    let id = if entry.id.is_empty() { repo.rsplit('/').next().unwrap_or_default().to_lowercase() } else { entry.id.clone() };
+    let manifest = Manifest { id, name: entry.name.clone(), description: entry.description.clone(), ..Default::default() };
+    Some(Remote { repo, private: true, access: false, manifest, version: String::new(), assets: Vec::new(), token: None })
+}
+
+/// Dépôts de l'organisation que le compte connecté voit (privés compris), en plus du catalogue.
+fn account_repos(tokens: &[String]) -> Vec<String> {
+    for token in tokens {
+        let Ok(list) = get("user/repos?per_page=100&affiliation=owner,collaborator,organization_member", Some(token)) else { continue };
+        return list
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|r| {
+                let owner = r.pointer("/owner/login").and_then(Value::as_str).unwrap_or_default();
+                github::owners().iter().any(|o| o.eq_ignore_ascii_case(owner)) && !r.get("archived").and_then(Value::as_bool).unwrap_or(false)
+            })
+            .filter_map(|r| Some(r.get("full_name")?.as_str()?.to_string()))
+            .collect();
+    }
+    Vec::new()
 }
 
 /// Extensions publiées, triées par nom.
 pub fn fetch() -> Result<Vec<Remote>, String> {
-    let mut list = Vec::new();
-    for (repo, (private, token)) in repos()? {
-        let Ok(release) = get(&format!("repos/{repo}/releases/latest"), token.as_deref()) else { continue };
-        let assets: Vec<Asset> = release
-            .get("assets")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|a| {
-                Some(Asset {
-                    id: a.get("id")?.as_u64()?,
-                    name: a.get("name")?.as_str()?.to_string(),
-                    url: a.get("browser_download_url").and_then(Value::as_str).unwrap_or_default().to_string(),
-                })
-            })
-            .collect();
-        let Some(json) = assets.iter().find(|a| a.name == "extension.json") else { continue };
-        let Ok(bytes) = asset(&repo, json, token.as_deref()) else { continue };
-        let text = String::from_utf8_lossy(&bytes);
-        let Ok(manifest) = serde_json::from_str::<Manifest>(text.trim_start_matches('\u{feff}')) else { continue };
-        let tag = release.get("tag_name").and_then(Value::as_str).unwrap_or_default();
-        let version = manifest.version.clone().unwrap_or_else(|| tag.trim_start_matches('v').to_string());
-        list.push(Remote { repo, private, manifest, version, assets, token });
+    let (catalogue, (tokens, extra)) = std::thread::scope(|s| {
+        let accounts = s.spawn(|| {
+            let tokens = tokens();
+            let extra = account_repos(&tokens);
+            (tokens, extra)
+        });
+        let catalogue = github::request("GET", CATALOGUE, None, None, "application/json")
+            .and_then(|b| serde_json::from_slice::<Vec<Entry>>(&b).map_err(|e| format!("Catalogue illisible : {e}")));
+        (catalogue, accounts.join().unwrap_or_default())
+    });
+    let mut entries = match catalogue {
+        Ok(list) => list,
+        Err(e) if extra.is_empty() => return Err(e),
+        Err(_) => Vec::new(),
+    };
+    for repo in extra {
+        if !entries.iter().any(|e| e.repo.eq_ignore_ascii_case(&repo)) {
+            entries.push(Entry { repo, id: String::new(), name: String::new(), description: None });
+        }
     }
-    list.sort_by_key(|r| r.manifest.name.to_lowercase());
+    // Tous les dépôts en même temps.
+    let mut list: Vec<Remote> = std::thread::scope(|s| {
+        let handles: Vec<_> = entries.iter().map(|entry| s.spawn(|| read(entry, &tokens))).collect();
+        handles.into_iter().filter_map(|h| h.join().ok().flatten()).collect()
+    });
+    list.sort_by_key(|r| (r.manifest.name.to_lowercase(), !r.access));
+    list.dedup_by(|a, b| a.manifest.id == b.manifest.id);
     Ok(list)
+}
+
+/// Fichiers à télécharger : ceux connus, sinon la liste de la release (avec un compte si
+/// possible), sinon au moins le manifeste et l'exe par leur lien direct.
+fn files_of(remote: &Remote) -> Vec<Asset> {
+    if !remote.assets.is_empty() {
+        return remote.assets.clone();
+    }
+    let attempts = tokens().into_iter().map(Some).chain(std::iter::once(None));
+    for token in attempts {
+        if let Ok((assets, _)) = release_assets(&remote.repo, token.as_deref()) {
+            if !assets.is_empty() {
+                return assets;
+            }
+        }
+    }
+    ["extension.json", remote.manifest.exe.as_str()]
+        .iter()
+        .filter(|n| !n.is_empty())
+        .map(|name| Asset {
+            id: 0,
+            name: name.to_string(),
+            url: format!("https://github.com/{}/releases/latest/download/{name}", remote.repo),
+        })
+        .collect()
 }
 
 /// Installe ou met à jour l'extension : les fichiers de la release sont téléchargés à
 /// part, puis l'ancienne version est fermée et remplacée. Les réglages (activée…) restent.
 pub fn install(remote: &Remote) -> Result<Manifest, String> {
+    if !remote.access {
+        return Err(format!("Vous n'avez pas accès à {}.", remote.manifest.name));
+    }
     let id = &remote.manifest.id;
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
         return Err(format!("Identifiant « {id} » invalide dans {}.", remote.repo));
@@ -155,11 +224,12 @@ pub fn install(remote: &Remote) -> Result<Manifest, String> {
     let staging = betterext::home_dir().join(".telechargement").join(id);
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
-    for file in &remote.assets {
+    for file in files_of(remote) {
         if file.name.contains('/') || file.name.contains('\\') || file.name.starts_with('.') {
             continue;
         }
-        let bytes = asset(&remote.repo, file, remote.token.as_deref())?;
+        // Public : lien direct ; privé : par l'API avec le jeton.
+        let bytes = asset(&remote.repo, &file, remote.token.as_deref())?;
         std::fs::write(staging.join(&file.name), bytes).map_err(|e| e.to_string())?;
     }
     let dest = extensions_dir().join(betterext::folder_name(&remote.manifest));

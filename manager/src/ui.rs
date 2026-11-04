@@ -746,11 +746,17 @@ impl App {
             card(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(&m.name).font(bold(15.5)));
-                    ui.label(RichText::new(format!("v{}", remote.version)).color(SUBTLE()).small());
+                    if !remote.version.is_empty() {
+                        ui.label(RichText::new(format!("v{}", remote.version)).color(SUBTLE()).small());
+                    }
                     if remote.private {
                         ui.label(RichText::new("· privée").color(SUBTLE()).small());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if !remote.access {
+                            ui.label(RichText::new("Accès réservé").color(SUBTLE()));
+                            return;
+                        }
                         let busy = self.installing.as_deref() == Some(m.id.as_str());
                         let installed = local.map(|r| r.ext.manifest.version.clone().unwrap_or_default());
                         let label = match &installed {
