@@ -753,10 +753,6 @@ impl App {
                         ui.label(RichText::new("· privée").color(SUBTLE()).small());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if !remote.access {
-                            ui.label(RichText::new("Accès réservé").color(SUBTLE()));
-                            return;
-                        }
                         let busy = self.installing.as_deref() == Some(m.id.as_str());
                         let installed = local.map(|r| r.ext.manifest.version.clone().unwrap_or_default());
                         let label = match &installed {

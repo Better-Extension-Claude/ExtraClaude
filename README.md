@@ -120,6 +120,5 @@ Découverte la trouve grâce à `extension.json`, et l'installation copie tous l
 de la release.
 
 Ajoutez ensuite le dépôt à [`catalogue.json`](catalogue.json) : c'est la liste de l'onglet
-Découverte. Une extension privée peut y figurer : les comptes qui n'y ont pas accès la
-voient, mais ne peuvent pas l'installer. `BetterClaude.exe --discover` affiche ce que voit
-l'onglet Découverte.
+Découverte. Une extension privée peut y figurer : elle ne s'affiche que pour les comptes
+qui y ont accès. `BetterClaude.exe --discover` affiche ce que voit l'onglet Découverte.

@@ -4,8 +4,8 @@
 //! y est donnée par son dépôt. Une seule requête, hors de l'API GitHub (pas de limite), puis
 //! chaque dépôt est lu **en même temps** que les autres :
 //! - public : `extension.json` de la dernière release par le lien direct, sans compte ;
-//! - privé : par l'API, avec le compte GitHub connecté (ou GitHub CLI). Sans accès,
-//!   l'extension reste affichée (nom et description du catalogue) mais ne s'installe pas.
+//! - privé : par l'API, avec le compte GitHub connecté (ou GitHub CLI). Sans compte ou sans
+//!   accès, l'extension n'est pas affichée.
 //!
 //! Avec un compte connecté, ses dépôts dans l'organisation s'ajoutent à la liste (une
 //! extension pas encore au catalogue). Installer copie tous les fichiers de la release.
@@ -37,8 +37,6 @@ pub struct Asset {
 pub struct Remote {
     pub repo: String,
     pub private: bool,
-    /// Faux : dépôt privé auquel le compte n'a pas accès (manifeste tiré du catalogue).
-    pub access: bool,
     pub manifest: Manifest,
     pub version: String,
     /// Vide pour un dépôt public lu sans l'API : la liste est lue à l'installation.
@@ -46,16 +44,11 @@ pub struct Remote {
     token: Option<String>,
 }
 
-/// Entrée du catalogue.
+/// Entrée du catalogue : le dépôt (`Organisation/nom`). Nom et description viennent de
+/// l'`extension.json` de sa release.
 #[derive(Clone, Deserialize)]
 struct Entry {
     repo: String,
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    name: String,
-    #[serde(default)]
-    description: Option<String>,
 }
 
 /// Jeton de GitHub CLI, s'il est installé et connecté (facultatif).
@@ -117,22 +110,17 @@ fn read(entry: &Entry, tokens: &[String]) -> Option<Remote> {
     let direct = format!("https://github.com/{repo}/releases/latest/download/extension.json");
     if let Some(manifest) = github::request("GET", &direct, None, None, "application/octet-stream").ok().and_then(|b| parse_manifest(&b)) {
         let version = manifest.version.clone().unwrap_or_default();
-        return Some(Remote { repo, private: false, access: true, manifest, version, assets: Vec::new(), token: None });
+        return Some(Remote { repo, private: false, manifest, version, assets: Vec::new(), token: None });
     }
     for token in tokens {
         let Ok((assets, tag)) = release_assets(&repo, Some(token)) else { continue };
         let json = assets.iter().find(|a| a.name == "extension.json")?;
         let manifest = asset(&repo, json, Some(token)).ok().and_then(|b| parse_manifest(&b))?;
         let version = manifest.version.clone().unwrap_or(tag);
-        return Some(Remote { repo, private: true, access: true, manifest, version, assets, token: Some(token.clone()) });
+        return Some(Remote { repo, private: true, manifest, version, assets, token: Some(token.clone()) });
     }
-    // Privée sans accès : ce que dit le catalogue.
-    if entry.name.is_empty() {
-        return None;
-    }
-    let id = if entry.id.is_empty() { repo.rsplit('/').next().unwrap_or_default().to_lowercase() } else { entry.id.clone() };
-    let manifest = Manifest { id, name: entry.name.clone(), description: entry.description.clone(), ..Default::default() };
-    Some(Remote { repo, private: true, access: false, manifest, version: String::new(), assets: Vec::new(), token: None })
+    // Privée sans compte ou sans accès : pas affichée.
+    None
 }
 
 /// Dépôts de l'organisation que le compte connecté voit (privés compris), en plus du catalogue.
@@ -172,7 +160,7 @@ pub fn fetch() -> Result<Vec<Remote>, String> {
     };
     for repo in extra {
         if !entries.iter().any(|e| e.repo.eq_ignore_ascii_case(&repo)) {
-            entries.push(Entry { repo, id: String::new(), name: String::new(), description: None });
+            entries.push(Entry { repo });
         }
     }
     // Tous les dépôts en même temps.
@@ -180,7 +168,7 @@ pub fn fetch() -> Result<Vec<Remote>, String> {
         let handles: Vec<_> = entries.iter().map(|entry| s.spawn(|| read(entry, &tokens))).collect();
         handles.into_iter().filter_map(|h| h.join().ok().flatten()).collect()
     });
-    list.sort_by_key(|r| (r.manifest.name.to_lowercase(), !r.access));
+    list.sort_by_key(|r| r.manifest.name.to_lowercase());
     list.dedup_by(|a, b| a.manifest.id == b.manifest.id);
     Ok(list)
 }
@@ -213,9 +201,6 @@ fn files_of(remote: &Remote) -> Vec<Asset> {
 /// Installe ou met à jour l'extension : les fichiers de la release sont téléchargés à
 /// part, puis l'ancienne version est fermée et remplacée. Les réglages (activée…) restent.
 pub fn install(remote: &Remote) -> Result<Manifest, String> {
-    if !remote.access {
-        return Err(format!("Vous n'avez pas accès à {}.", remote.manifest.name));
-    }
     let id = &remote.manifest.id;
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
         return Err(format!("Identifiant « {id} » invalide dans {}.", remote.repo));

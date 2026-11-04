@@ -1,6 +1,6 @@
 [package]
 name = "betterext-manager"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Gestionnaire d'extensions de Claude : un seul hook, les extensions activées démarrent seules"
 

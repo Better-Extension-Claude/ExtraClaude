@@ -62,7 +62,7 @@ fn main() {
     // Diagnostic : ce que l'onglet Découverte voit.
     if has("--discover") {
         match discover::fetch() {
-            Ok(list) => list.iter().for_each(|r| println!("{}\t{}\tv{}\tprivée={}\taccès={}", r.manifest.id, r.repo, r.version, r.private, r.access)),
+            Ok(list) => list.iter().for_each(|r| println!("{}\t{}\tv{}\tprivée={}", r.manifest.id, r.repo, r.version, r.private)),
             Err(e) => println!("erreur : {e}"),
         }
         return;
