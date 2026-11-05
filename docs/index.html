@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExtraClaude – extensions (mods) pour Claude desktop sur Windows</title>
+<meta name="description" content="ExtraClaude est un gestionnaire d'extensions non officiel pour l'application Claude desktop sur Windows : installez des mods comme GitPush en un clic. Unofficial add-on manager for the Claude desktop app.">
+<meta name="keywords" content="ExtraClaude, Claude desktop, Claude extensions, Claude mods, Claude add-ons, Claude plugins, Claude Code hooks, Windows, GitPush">
+<link rel="canonical" href="https://better-extension-claude.github.io/ExtraClaude/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ExtraClaude – extensions pour Claude desktop">
+<meta property="og:description" content="Installez des extensions (mods) dans l'application Claude desktop sur Windows, en un clic.">
+<meta property="og:url" content="https://better-extension-claude.github.io/ExtraClaude/">
+<meta property="og:image" content="https://better-extension-claude.github.io/ExtraClaude/capture.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ExtraClaude",
+  "description": "Unofficial add-on manager for the Claude desktop app on Windows. Install, enable and update extensions (mods) such as GitPush in one click.",
+  "operatingSystem": "Windows 10, Windows 11",
+  "applicationCategory": "DeveloperApplication",
+  "softwareVersion": "0.1.7",
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "downloadUrl": "https://github.com/Better-Extension-Claude/ExtraClaude/releases/latest",
+  "codeRepository": "https://github.com/Better-Extension-Claude/ExtraClaude",
+  "inLanguage": "fr"
+}
+</script>
+<style>
+  :root { --fond: #FAF9F5; --carte: #F0EEE6; --texte: #1F1E1D; --second: #73726C; --accent: #C96442; --bordure: #D9D6CC; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fond: #262624; --carte: #2E2E2B; --texte: #ECEBE6; --second: #9A9893; --accent: #D97757; --bordure: #45443F; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fond); color: var(--texte); font: 17px/1.6 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: 2.4rem; margin: 0 0 .2em; color: var(--accent); }
+  h2 { font-size: 1.3rem; margin: 2em 0 .5em; }
+  .sous-titre { font-size: 1.2rem; margin: 0 0 1.5em; }
+  .bouton { display: inline-block; background: var(--accent); color: #fff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  .secondaire { margin-left: 16px; color: var(--accent); }
+  img { width: 100%; max-width: 680px; border-radius: 10px; border: 1px solid var(--bordure); margin: 32px 0 8px; }
+  .carte { background: var(--carte); border: 1px solid var(--bordure); border-radius: 10px; padding: 4px 20px; }
+  .note { color: var(--second); font-size: .95rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ExtraClaude</h1>
+  <p class="sous-titre">Ajoutez des extensions (mods, add-ons) à l'application Claude desktop sur Windows.</p>
+  <p>
+    <a class="bouton" href="https://github.com/Better-Extension-Claude/ExtraClaude/releases/latest">Télécharger ExtraClaude</a>
+    <a class="secondaire" href="https://github.com/Better-Extension-Claude/ExtraClaude">Code source sur GitHub</a>
+  </p>
+  <img src="capture.png" alt="La fenêtre d'ExtraClaude : l'onglet Mes extensions avec GitPush installé" width="680" height="640">
+
+  <h2>Ce que fait ExtraClaude</h2>
+  <p>ExtraClaude installe, active et met à jour des extensions pour Claude desktop. Elles ajoutent des boutons,
+  des fenêtres et des fonctions à l'application Claude elle-même, et réagissent à ce que fait Claude Code.
+  Ce ne sont pas des serveurs MCP.</p>
+  <div class="carte">
+    <p><strong><a href="https://github.com/Better-Extension-Claude/GitPush">GitPush</a></strong> : envoyez votre projet sur GitHub en un clic, sans passer par Claude.</p>
+  </div>
+
+  <h2>Installer</h2>
+  <ol>
+    <li>Téléchargez <code>ExtraClaude.exe</code> dans la <a href="https://github.com/Better-Extension-Claude/ExtraClaude/releases/latest">dernière version</a>.</li>
+    <li>Lancez-le, choisissez où l'installer, puis cliquez sur <strong>Installer</strong>.</li>
+    <li>Ouvrez Claude : un bouton puzzle apparaît dans la barre latérale. Il ouvre ExtraClaude.</li>
+  </ol>
+  <p>ExtraClaude se met à jour tout seul. Les extensions s'installent depuis son onglet <strong>Découverte</strong>.</p>
+
+  <h2 lang="en">In English</h2>
+  <p lang="en"><strong>ExtraClaude is an unofficial add-on manager for the Claude desktop app on Windows.</strong>
+  It installs, enables and updates extensions (mods) that add buttons, windows and features to Claude desktop,
+  such as GitPush, which pushes your project to GitHub in one click. They are not MCP servers: they extend the
+  Claude app itself and react to Claude Code events through hooks. Free and open source (MIT). The interface is in French.</p>
+
+  <p class="note">Projet non officiel, sans lien avec Anthropic. Claude est une marque d'Anthropic.</p>
+</main>
+</body>
+</html>

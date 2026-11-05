@@ -1,10 +1,30 @@
 # ExtraClaude
 
-**Ajoutez des extensions à Claude desktop (Windows).**
+**Ajoutez des extensions (mods, add-ons) à l'application Claude desktop sur Windows.**
 
-ExtraClaude est l'application principale : elle installe, active et met à jour les
-extensions de l'organisation [Better-Extension-Claude](https://github.com/Better-Extension-Claude).
-Sans lui, les extensions ne démarrent pas.
+![ExtraClaude, onglet Mes extensions](docs/capture.png)
+
+ExtraClaude est le gestionnaire d'extensions de Claude desktop : il installe, active et met à jour
+les extensions de l'organisation [Better-Extension-Claude](https://github.com/Better-Extension-Claude),
+comme [GitPush](https://github.com/Better-Extension-Claude/GitPush) (envoyer son projet sur GitHub
+en un clic). Sans lui, les extensions ne démarrent pas.
+
+Ce ne sont pas des serveurs MCP : les extensions ajoutent des boutons, des fenêtres et des
+fonctions à l'application Claude elle-même, et réagissent à ce que fait Claude Code.
+
+> Projet non officiel, sans lien avec Anthropic. Claude est une marque d'Anthropic.
+
+## In English
+
+**ExtraClaude is an unofficial add-on manager for the Claude desktop app on Windows.** It lets
+you install, enable and update extensions (mods) that add buttons, windows and features to
+Claude desktop, such as [GitPush](https://github.com/Better-Extension-Claude/GitPush), which
+pushes your project to GitHub in one click. These are not MCP servers: they extend the Claude
+app itself and react to Claude Code events through hooks.
+
+Download `ExtraClaude.exe` from the [latest release](https://github.com/Better-Extension-Claude/ExtraClaude/releases/latest),
+run it and click **Installer**. A puzzle button then appears in Claude's sidebar. The interface
+is in French. Not affiliated with Anthropic.
 
 ## Installer
 
