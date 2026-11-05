@@ -1,6 +1,6 @@
 //! Le bouton puzzle sur Claude : une petite fenêtre Win32 gardée juste au-dessus de Claude, collée à
 //! gauche de son bouton « Paramètres » (en bas de la barre latérale). Un clic ouvre la
-//! fenêtre BetterClaude. Le bouton « Paramètres » est trouvé par UI Automation : le puzzle suit
+//! fenêtre ExtraClaude. Le bouton « Paramètres » est trouvé par UI Automation : le puzzle suit
 //! la barre latérale quand on l'élargit, et se cache quand elle est repliée.
 
 use std::cell::RefCell;
@@ -33,7 +33,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
-pub const BUTTON_TITLE: &str = "BetterClaude-bouton";
+pub const BUTTON_TITLE: &str = "ExtraClaude-bouton";
 const WM_MOUSELEAVE: u32 = 0x02A3;
 
 /// Journal détaillé du bouton (`%LOCALAPPDATA%\BetterExt\button.log`), actif tant que le
@@ -557,7 +557,7 @@ unsafe extern "system" fn on_event(
 }
 
 
-/// Ouvre la fenêtre BetterClaude (ou la ramène devant si elle est déjà ouverte).
+/// Ouvre la fenêtre ExtraClaude (ou la ramène devant si elle est déjà ouverte).
 fn open_window() {
     unsafe { AllowSetForegroundWindow(ASFW_ANY) };
     if let Ok(exe) = std::env::current_exe() {
@@ -582,7 +582,7 @@ pub fn run() {
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let instance = GetModuleHandleW(std::ptr::null());
-        let class = wide("BetterClaudeButton");
+        let class = wide("ExtraClaudeButton");
         let wc = WNDCLASSW {
             style: 0,
             lpfnWndProc: Some(wndproc),

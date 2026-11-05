@@ -1,4 +1,4 @@
-//! La fenêtre BetterClaude, ouverte par le bouton puzzle sur Claude : extensions installées,
+//! La fenêtre ExtraClaude, ouverte par le bouton puzzle sur Claude : extensions installées,
 //! Découverte (extensions publiées, clés d'accès aux privées) et réglages. Même allure que
 //! la fenêtre GitPush : sans barre de Windows, déplacée par son en-tête, fermée par sa croix.
 
@@ -13,7 +13,7 @@ use eframe::egui::{
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-const TITLE: &str = "BetterClaude";
+const TITLE: &str = "ExtraClaude";
 use betterext::theme::{self, Palette, Rgb};
 use std::cell::RefCell;
 
@@ -71,7 +71,7 @@ fn reload_theme() -> bool {
 }
 
 /// Emplacement réel d'un dossier pour l'Explorateur. Claude desktop est une app du Microsoft
-/// Store : ce qu'il lance (hooks, BetterClaude, extensions) et qui écrit dans `AppData\Local`
+/// Store : ce qu'il lance (hooks, ExtraClaude, extensions) et qui écrit dans `AppData\Local`
 /// écrit en fait dans sa copie privée, `AppData\Local\Packages\Claude_…\LocalCache\Local\`.
 /// L'Explorateur, hors de l'app, ne voit que cette copie.
 fn real_path(path: &std::path::Path) -> std::path::PathBuf {
@@ -257,9 +257,9 @@ enum Job {
     LoggedIn(Result<Session, String>),
     DevLoaded(Result<Vec<ManagedRepo>, String>),
     DevDone(Result<String, String>),
-    /// Nouvelle version de BetterClaude publiée (None : à jour).
+    /// Nouvelle version d'ExtraClaude publiée (None : à jour).
     SelfChecked(Result<Option<String>, String>),
-    /// BetterClaude remplacé par la nouvelle version : son exe.
+    /// ExtraClaude remplacé par la nouvelle version : son exe.
     SelfUpdated(Result<std::path::PathBuf, String>),
 }
 
@@ -294,7 +294,7 @@ struct App {
     dev_busy: bool,
     invites: HashMap<String, Invite>,
     jobs: (Sender<Job>, Receiver<Job>),
-    /// Dernière vérification de BetterClaude : None tant qu'elle n'est pas finie.
+    /// Dernière vérification d'ExtraClaude : None tant qu'elle n'est pas finie.
     self_latest: Option<Result<Option<String>, String>>,
     self_checking: bool,
     self_updating: bool,
@@ -453,16 +453,16 @@ impl App {
         self.report(Ok(text));
     }
 
-    /// Fin de « Vérifier les mises à jour » dans Réglages (BetterClaude).
+    /// Fin de « Vérifier les mises à jour » dans Réglages (ExtraClaude).
     fn finish_self_check(&mut self) {
         if !self.check_self_asked {
             return;
         }
         self.check_self_asked = false;
         let result = match &self.self_latest {
-            Some(Ok(Some(v))) => Ok(format!("BetterClaude {v} est disponible.")),
+            Some(Ok(Some(v))) => Ok(format!("ExtraClaude {v} est disponible.")),
             Some(Err(e)) => Err(e.clone()),
-            _ => Ok("BetterClaude est à jour.".to_string()),
+            _ => Ok("ExtraClaude est à jour.".to_string()),
         };
         self.report(result);
     }
@@ -492,7 +492,7 @@ impl App {
                     self.finish_self_check();
                     if let Some(v) = newer.filter(|_| opening && self.state.self_update()) {
                         if crate::update::installed_self().is_some() {
-                            self.report(Ok(format!("Mise à jour de BetterClaude vers la version {v}…")));
+                            self.report(Ok(format!("Mise à jour d'ExtraClaude vers la version {v}…")));
                             self.update_self(v, ctx);
                         }
                     }
@@ -625,7 +625,7 @@ impl App {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
         ui.horizontal(|ui| {
-            ui.label(RichText::new("BetterClaude").font(bold(22.0)).color(ACCENT()));
+            ui.label(RichText::new("ExtraClaude").font(bold(22.0)).color(ACCENT()));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if close_button(ui).on_hover_text("Fermer (Échap)").clicked() {
                     close = true;
@@ -1010,12 +1010,12 @@ impl App {
     // ------------------------------------------------------------ Réglages
 
     fn settings(&mut self, ui: &mut Ui) {
-        section(ui, "BetterClaude");
+        section(ui, "ExtraClaude");
         card(ui, |ui| {
             let about = if self.hooked.is_some() {
-                "BetterClaude est actif : vos extensions démarrent en même temps que Claude."
+                "ExtraClaude est actif : vos extensions démarrent en même temps que Claude."
             } else {
-                "Choisissez où installer BetterClaude. Vos extensions seront rangées au même endroit."
+                "Choisissez où installer ExtraClaude. Vos extensions seront rangées au même endroit."
             };
             ui.label(RichText::new(about).color(SUBTLE()));
             ui.horizontal(|ui| {
@@ -1031,13 +1031,13 @@ impl App {
                 let label = if self.hooked.is_some() { "Réinstaller" } else { "Installer" };
                 if ui.add(primary(label)).clicked() {
                     let folder = self.folder.clone();
-                    let result = setup::install(&folder).map(|_| "BetterClaude est installé. Vos extensions démarreront avec Claude.".to_string());
+                    let result = setup::install(&folder).map(|_| "ExtraClaude est installé. Vos extensions démarreront avec Claude.".to_string());
                     self.report(result);
                 }
                 if self.hooked.is_some()
                     && ui.button("Désactiver").on_hover_text("Plus aucune extension ne démarrera avec Claude.").clicked()
                 {
-                    let result = setup::uninstall().map(|_| "BetterClaude est désactivé : les extensions ne démarreront plus avec Claude.".to_string());
+                    let result = setup::uninstall().map(|_| "ExtraClaude est désactivé : les extensions ne démarreront plus avec Claude.".to_string());
                     self.report(result);
                 }
             });
@@ -1053,7 +1053,7 @@ impl App {
                 None => String::new(),
             };
             ui.horizontal(|ui| {
-                ui.label(format!("BetterClaude {}", crate::update::current()));
+                ui.label(format!("ExtraClaude {}", crate::update::current()));
                 ui.label(RichText::new(format!("· {status}")).color(SUBTLE()));
                 if let Some(Ok(Some(v))) = self.self_latest.clone() {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1065,7 +1065,7 @@ impl App {
                 }
             });
             let mut self_update = self.state.self_update();
-            if ui.checkbox(&mut self_update, "Mettre à jour BetterClaude automatiquement").changed() {
+            if ui.checkbox(&mut self_update, "Mettre à jour ExtraClaude automatiquement").changed() {
                 self.state.self_update = Some(self_update);
                 self.save_state();
             }
@@ -1079,7 +1079,7 @@ impl App {
 
         section(ui, "Apparence");
         card(ui, |ui| {
-            ui.label(RichText::new("Les couleurs de BetterClaude et de vos extensions.").color(SUBTLE()));
+            ui.label(RichText::new("Les couleurs d'ExtraClaude et de vos extensions.").color(SUBTLE()));
             let before = self.theme.clone();
             ui.horizontal(|ui| {
                 ui.label("Thème");
@@ -1233,7 +1233,7 @@ fn center_on_claude(hwnd: isize, size: [f32; 2]) {
     }
 }
 
-/// Ramène la fenêtre BetterClaude déjà ouverte (même réduite, même sur un autre écran) au
+/// Ramène la fenêtre ExtraClaude déjà ouverte (même réduite, même sur un autre écran) au
 /// centre de Claude, devant : un clic sur le puzzle la retrouve toujours là.
 pub fn focus_existing() {
     use windows_sys::Win32::Foundation::RECT;

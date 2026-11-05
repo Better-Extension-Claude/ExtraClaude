@@ -1,6 +1,6 @@
 //! Découverte : les extensions publiées sur GitHub.
 //!
-//! La liste vient du **catalogue** (`catalogue.json` du dépôt BetterClaude) : chaque extension
+//! La liste vient du **catalogue** (`catalogue.json` du dépôt ExtraClaude) : chaque extension
 //! y est donnée par son dépôt. Une seule requête, hors de l'API GitHub (pas de limite), puis
 //! chaque dépôt est lu **en même temps** que les autres :
 //! - public : `extension.json` de la dernière release par le lien direct, sans compte ;
@@ -22,7 +22,7 @@ use std::time::Duration;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Catalogue des extensions, lu sans passer par l'API GitHub.
-const CATALOGUE: &str = "https://raw.githubusercontent.com/Better-Extension-Claude/BetterClaude/main/catalogue.json";
+const CATALOGUE: &str = "https://raw.githubusercontent.com/Better-Extension-Claude/ExtraClaude/main/catalogue.json";
 
 #[derive(Clone)]
 pub struct Asset {

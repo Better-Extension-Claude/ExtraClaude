@@ -1,17 +1,17 @@
-# BetterClaude
+# ExtraClaude
 
 **Ajoutez des extensions à Claude desktop (Windows).**
 
-BetterClaude est l'application principale : elle installe, active et met à jour les
+ExtraClaude est l'application principale : elle installe, active et met à jour les
 extensions de l'organisation [Better-Extension-Claude](https://github.com/Better-Extension-Claude).
 Sans lui, les extensions ne démarrent pas.
 
 ## Installer
 
-1. Téléchargez `BetterClaude.exe` dans la [dernière version](https://github.com/Better-Extension-Claude/BetterClaude/releases/latest).
+1. Téléchargez `ExtraClaude.exe` dans la [dernière version](https://github.com/Better-Extension-Claude/ExtraClaude/releases/latest).
 2. Lancez-le, choisissez où l'installer, puis cliquez sur **Installer**.
 3. Ouvrez Claude : un bouton puzzle apparaît en bas de la barre latérale, à gauche de
-   l'engrenage des paramètres. Il ouvre BetterClaude.
+   l'engrenage des paramètres. Il ouvre ExtraClaude.
 
 ## Utiliser
 
@@ -19,12 +19,12 @@ Sans lui, les extensions ne démarrent pas.
 - **Mes extensions** : activez ou désactivez chaque extension, mettez-la à jour, ouvrez
   son dossier ou retirez-la.
 - **Réglages** :
-  - où sont rangées les extensions (par défaut `%USERPROFILE%\BetterClaude\Extensions`).
+  - où sont rangées les extensions (par défaut `%USERPROFILE%\ExtraClaude\Extensions`).
     Changer de dossier y déplace les extensions ;
   - l'apparence : comme Claude, clair ou sombre, et chaque couleur des deux thèmes.
     Toutes les extensions suivent ce réglage ;
-  - les mises à jour de BetterClaude : il se met à jour tout seul (à l'ouverture de Claude
-    et de la fenêtre BetterClaude). Ça peut se décocher ; **Mettre à jour** et **Vérifier les mises
+  - les mises à jour d'ExtraClaude : il se met à jour tout seul (à l'ouverture de Claude
+    et de la fenêtre ExtraClaude). Ça peut se décocher ; **Mettre à jour** et **Vérifier les mises
     à jour** restent disponibles.
 
 Les extensions ne se mettent à jour que quand vous le demandez : **Vérifier les mises à
@@ -35,7 +35,7 @@ ne démarre plus.
 
 Certaines extensions sont privées : **Se connecter à GitHub** les affiche si votre compte
 y a accès. Un code s'affiche (il est déjà copié) : collez-le sur la page GitHub qui
-s'ouvre. BetterClaude ne contient aucun secret, et la session est gardée chiffrée pour
+s'ouvre. ExtraClaude ne contient aucun secret, et la session est gardée chiffrée pour
 votre compte Windows.
 
 ## Extensions disponibles
@@ -56,12 +56,12 @@ Rust, chaîne GNU (`stable-x86_64-pc-windows-gnu`) :
 bash build.sh
 ```
 
-L'exe est dans `dist/BetterClaude.exe`.
+L'exe est dans `dist/ExtraClaude.exe`.
 
 ### Comment ça marche
 
-BetterClaude est le **seul** hook de Claude Code (`~/.claude/settings.json`) :
-`BetterClaude.exe --hook` lit l'événement sur son entrée standard, lance les extensions
+ExtraClaude est le **seul** hook de Claude Code (`~/.claude/settings.json`) :
+`ExtraClaude.exe --hook` lit l'événement sur son entrée standard, lance les extensions
 activées au `SessionStart`, puis envoie l'événement à chaque extension qui l'écoute, sur
 son pipe nommé `\\.\pipe\betterext-<id>`. Il rend la main sans rien écrire : une
 extension ne peut pas bloquer Claude.
@@ -88,7 +88,7 @@ Une extension est un dossier qui contient `extension.json` et son exe :
 - `id` : lettres minuscules, chiffres et tirets, stable (pipe, réglages).
 - `version` : à monter à chaque publication (c'est ce que compare « Mettre à jour »).
 - `exe` : relatif au dossier du manifeste.
-- `start` : arguments du lancement en début de session. Absent : jamais lancée par BetterClaude.
+- `start` : arguments du lancement en début de session. Absent : jamais lancée par ExtraClaude.
 - `events` : événements reçus (`"*"` pour tous) parmi `SessionStart`, `SessionEnd`,
   `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`,
   `SubagentStop`, `PreCompact`. Chacun arrive comme le JSON du hook de Claude, sur une ligne.
@@ -113,7 +113,7 @@ Règles :
 Pour installer une extension en cours de développement comme le ferait un utilisateur :
 
 ```bash
-BetterClaude.exe --add dist\extension.json
+ExtraClaude.exe --add dist\extension.json
 ```
 
 ### Publier
@@ -125,5 +125,5 @@ de la release.
 
 Une extension publique s'ajoute ensuite à [`catalogue.json`](catalogue.json), la liste
 de l'onglet Découverte. Une extension privée n'y va pas : elle s'affiche d'elle-même pour
-les comptes GitHub qui y ont accès. `BetterClaude.exe --discover` affiche ce que voit
+les comptes GitHub qui y ont accès. `ExtraClaude.exe --discover` affiche ce que voit
 l'onglet Découverte.

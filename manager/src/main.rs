@@ -10,7 +10,7 @@ mod setup;
 mod ui;
 mod update;
 
-/// Modes de BetterClaude.exe :
+/// Modes d'ExtraClaude.exe :
 /// - `--hook` : appelé par Claude à chaque événement (JSON sur l'entrée standard) ;
 /// - `--button` : le bouton puzzle sur Claude, lancé en début de session (il fait aussi les
 ///   mises à jour automatiques) ;
@@ -28,7 +28,7 @@ fn main() {
     update::cleanup();
     let wait = std::time::Duration::from_secs(if has("--relaunch") { 10 } else { 0 });
     if has("--button") {
-        if betterext::process::single_instance_wait(r"Local\BetterClaude-bouton", wait) {
+        if betterext::process::single_instance_wait(r"Local\ExtraClaude-bouton", wait) {
             update::watch();
             button::run();
         }
@@ -94,7 +94,7 @@ fn main() {
         let ok = setup::install(args.get(i + 1).map(String::as_str).unwrap_or("")).is_ok();
         std::process::exit(if ok { 0 } else { 1 });
     }
-    if betterext::process::single_instance_wait(r"Local\BetterClaude-fenetre", wait) {
+    if betterext::process::single_instance_wait(r"Local\ExtraClaude-fenetre", wait) {
         ui::run();
     } else {
         ui::focus_existing();

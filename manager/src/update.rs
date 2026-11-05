@@ -1,11 +1,11 @@
-//! Mise à jour de BetterClaude lui-même (dernière release du dépôt BetterClaude).
+//! Mise à jour d'ExtraClaude lui-même (dernière release du dépôt ExtraClaude).
 //!
-//! BetterClaude se remplace sur place : la nouvelle version est téléchargée à côté
-//! (`BetterClaude.new.exe`), l'exe en marche est renommé `BetterClaude.old.exe` (Windows
+//! ExtraClaude se remplace sur place : la nouvelle version est téléchargée à côté
+//! (`ExtraClaude.new.exe`), l'exe en marche est renommé `ExtraClaude.old.exe` (Windows
 //! permet de renommer un exe en marche, pas de l'écraser), puis la nouvelle prend sa place.
 //! L'ancienne copie est effacée au lancement suivant.
 //!
-//! Automatique : à l'ouverture de Claude (bouton puzzle) et à l'ouverture de la fenêtre BetterClaude.
+//! Automatique : à l'ouverture de Claude (bouton puzzle) et à l'ouverture de la fenêtre ExtraClaude.
 
 use crate::{discover, github, setup};
 use betterext::process;
@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-const REPO: &str = "Better-Extension-Claude/BetterClaude";
+const REPO: &str = "Better-Extension-Claude/ExtraClaude";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Version de cet exe.
@@ -51,7 +51,7 @@ pub fn installed_self() -> Option<PathBuf> {
 }
 
 fn old_copy(exe: &Path) -> PathBuf {
-    exe.with_file_name("BetterClaude.old.exe")
+    exe.with_file_name("ExtraClaude.old.exe")
 }
 
 /// Efface l'ancienne copie laissée par la dernière mise à jour (au lancement).
@@ -66,13 +66,13 @@ pub fn cleanup() {
 
 /// Télécharge `version` et remplace l'exe installé. Renvoie son chemin.
 pub fn apply(version: &str) -> Result<PathBuf, String> {
-    let exe = installed_self().ok_or("Seul BetterClaude installé peut se mettre à jour.")?;
-    let url = format!("https://github.com/{REPO}/releases/download/v{version}/BetterClaude.exe");
+    let exe = installed_self().ok_or("Seul ExtraClaude installé peut se mettre à jour.")?;
+    let url = format!("https://github.com/{REPO}/releases/download/v{version}/ExtraClaude.exe");
     let bytes = github::request("GET", &url, None, None, "application/octet-stream")?;
     if bytes.len() < 1_000_000 || !bytes.starts_with(b"MZ") {
         return Err("Le fichier téléchargé n'est pas valide : rien n'a été changé.".into());
     }
-    let new = exe.with_file_name("BetterClaude.new.exe");
+    let new = exe.with_file_name("ExtraClaude.new.exe");
     std::fs::write(&new, &bytes).map_err(|e| format!("Écriture impossible : {e}"))?;
     let old = old_copy(&exe);
     let _ = std::fs::remove_file(&old);
@@ -88,7 +88,7 @@ pub fn apply(version: &str) -> Result<PathBuf, String> {
 }
 
 /// Après [`apply`] : relance le bouton puzzle avec la nouvelle version (l'ancien tourne
-/// encore sous le nom `BetterClaude.old.exe`).
+/// encore sous le nom `ExtraClaude.old.exe`).
 pub fn restart_button(exe: &Path) {
     process::kill_all(&old_copy(exe));
     if betterext::claude::is_open() {
@@ -96,7 +96,7 @@ pub fn restart_button(exe: &Path) {
     }
 }
 
-/// Mise à jour automatique de BetterClaude, depuis le bouton puzzle, une fois à l'ouverture
+/// Mise à jour automatique d'ExtraClaude, depuis le bouton puzzle, une fois à l'ouverture
 /// de Claude. Les extensions, elles, ne se mettent à jour que sur demande.
 pub fn watch() {
     std::thread::spawn(|| {

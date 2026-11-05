@@ -1,7 +1,7 @@
-//! Contrat entre BetterClaude et ses extensions.
+//! Contrat entre ExtraClaude et ses extensions.
 //!
 //! Une extension est un dossier de [`extensions_dir`] qui contient `extension.json` (le
-//! [`Manifest`]) et son exe. BetterClaude est le seul hook de Claude :
+//! [`Manifest`]) et son exe. ExtraClaude est le seul hook de Claude :
 //! - à chaque début de session, il lance l'exe des extensions activées avec `start`
 //!   (sauf si elles tournent déjà) ;
 //! - pour chaque événement de Claude listé dans `events`, il envoie le JSON du hook, tel
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// Événements de Claude Code que BetterClaude écoute (un hook chacun dans settings.json).
+/// Événements de Claude Code qu'ExtraClaude écoute (un hook chacun dans settings.json).
 pub const EVENTS: &[&str] = &[
     "SessionStart",
     "SessionEnd",
@@ -45,7 +45,7 @@ pub struct Manifest {
     /// Exe de l'extension : chemin relatif au dossier du manifeste, ou absolu.
     pub exe: String,
     /// Arguments du lancement en début de session. Absent : l'extension n'est jamais lancée
-    /// par BetterClaude (elle ne fait qu'écouter, lancée autrement).
+    /// par ExtraClaude (elle ne fait qu'écouter, lancée autrement).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<Vec<String>>,
     /// Événements de Claude envoyés sur son pipe ; `"*"` pour tous.
@@ -84,16 +84,16 @@ pub fn data_dir() -> PathBuf {
     local_app_data().join("BetterExt")
 }
 
-/// `%USERPROFILE%\BetterClaude` : là où BetterClaude installe ce qu'on télécharge. Hors
+/// `%USERPROFILE%\ExtraClaude` : là où ExtraClaude installe ce qu'on télécharge. Hors
 /// d'`AppData` exprès : Claude desktop (app du Microsoft Store) redirige ce que ses programmes y
 /// créent vers sa copie privée, invisible dans l'Explorateur et effacée avec l'app.
 pub fn home_dir() -> PathBuf {
-    PathBuf::from(std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into())).join("BetterClaude")
+    PathBuf::from(std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into())).join("ExtraClaude")
 }
 
 /// Dossier des extensions installées, une par sous-dossier à son nom (`extension.json`, son exe
 /// et ce dont elle a besoin, rien d'autre). Choisi dans les réglages ; par défaut
-/// `%USERPROFILE%\BetterClaude\Extensions`.
+/// `%USERPROFILE%\ExtraClaude\Extensions`.
 pub fn extensions_dir() -> PathBuf {
     State::load()
         .extensions_dir
@@ -139,12 +139,12 @@ pub fn installed() -> Vec<Extension> {
 }
 
 /// `state.json` : extensions activées (une extension absente de la liste est activée),
-/// mise à jour automatique de BetterClaude et dossier des extensions.
+/// mise à jour automatique d'ExtraClaude et dossier des extensions.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
     pub enabled: BTreeMap<String, bool>,
-    /// Mises à jour automatiques de BetterClaude lui-même (activées si absent).
+    /// Mises à jour automatiques d'ExtraClaude lui-même (activées si absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub self_update: Option<bool>,
     /// Dossier des extensions installées ([`extensions_dir`]) ; absent : celui par défaut.

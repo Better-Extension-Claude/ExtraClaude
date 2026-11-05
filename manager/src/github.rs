@@ -1,8 +1,8 @@
 //! GitHub sans GitHub CLI : appels HTTPS par `curl.exe` (livré avec Windows), connexion par
-//! code (« device flow ») avec l'appli GitHub de BetterClaude, et gestion des accès aux
+//! code (« device flow ») avec l'appli GitHub d'ExtraClaude, et gestion des accès aux
 //! dépôts pour le propriétaire (panneau dev).
 //!
-//! BetterClaude ne contient aucun secret : CLIENT_ID est public. Ce qu'un compte peut voir
+//! ExtraClaude ne contient aucun secret : CLIENT_ID est public. Ce qu'un compte peut voir
 //! ou modifier, c'est GitHub qui le décide pour ce compte.
 
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,10 @@ use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// Identifiant public de l'appli GitHub « BetterClaude » (connexion par code). Vide tant
+/// Identifiant public de l'appli GitHub « ExtraClaude » (connexion par code). Vide tant
 /// que l'appli n'est pas créée : la connexion est alors indisponible.
 pub const CLIENT_ID: &str = "Iv23lirfagQxl4Xua7Ya";
-/// Compte propriétaire de BetterClaude : son panneau dev n'apparaît que pour lui.
+/// Compte propriétaire d'ExtraClaude : son panneau dev n'apparaît que pour lui.
 pub const OWNER: &str = "zomone";
 /// Organisation où sont rangées les extensions (publiques et privées). Vide : pas encore.
 pub const ORG: &str = "Better-Extension-Claude";

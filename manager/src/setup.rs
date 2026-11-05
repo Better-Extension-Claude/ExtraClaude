@@ -1,5 +1,5 @@
-//! Installation de BetterClaude : copie de l'exe, ses hooks dans les réglages de Claude Code,
-//! et reprise de GitPush (son propre hook devient une extension de BetterClaude).
+//! Installation d'ExtraClaude : copie de l'exe, ses hooks dans les réglages de Claude Code,
+//! et reprise de GitPush (son propre hook devient une extension d'ExtraClaude).
 
 use betterext::{extensions_dir, process, Extension, Manifest, EVENTS};
 use serde_json::{json, Value};
@@ -13,7 +13,7 @@ pub fn settings_path() -> PathBuf {
     dir.join("settings.json")
 }
 
-/// Dossier proposé à l'installation : `%USERPROFILE%\BetterClaude` (BetterClaude.exe, et ses
+/// Dossier proposé à l'installation : `%USERPROFILE%\ExtraClaude` (ExtraClaude.exe, et ses
 /// extensions dans `Extensions\`). Hors d'`AppData`, que Claude desktop redirige vers sa copie privée.
 pub fn default_folder() -> PathBuf {
     betterext::home_dir()
@@ -24,7 +24,7 @@ fn command_of(hook: &Value) -> &str {
 }
 
 fn is_ours(hook: &Value) -> bool {
-    command_of(hook).to_lowercase().contains("betterclaude.exe")
+    command_of(hook).to_lowercase().contains("extraclaude.exe")
 }
 
 /// Exe d'une commande de hook : `"C:/…/x.exe" --arg` ou `C:/…/x.exe`.
@@ -75,7 +75,7 @@ fn all_hooks(settings: &Value) -> impl Iterator<Item = &Value> {
         .flatten()
 }
 
-/// BetterClaude.exe que les hooks de Claude lancent, s'il est branché.
+/// ExtraClaude.exe que les hooks de Claude lancent, s'il est branché.
 pub fn hooked_exe() -> Option<PathBuf> {
     let settings = read_settings().ok()?;
     let found = all_hooks(&settings).find(|h| is_ours(h)).map(|h| exe_in(command_of(h)));
@@ -109,21 +109,21 @@ fn edit_hooks(settings: &mut Value, drop: impl Fn(&Value) -> bool, add: &[(&str,
 }
 
 
-/// Copie BetterClaude.exe dans `folder` et branche ses hooks sur tous les événements de Claude.
+/// Copie ExtraClaude.exe dans `folder` et branche ses hooks sur tous les événements de Claude.
 pub fn install(folder: &str) -> Result<PathBuf, String> {
     let folder = PathBuf::from(folder.trim());
     if folder.as_os_str().is_empty() {
         return Err("Choisis un dossier.".into());
     }
     let me = std::env::current_exe().map_err(|e| e.to_string())?;
-    let target = folder.join("BetterClaude.exe");
+    let target = folder.join("ExtraClaude.exe");
     std::fs::create_dir_all(&folder).map_err(|e| format!("Création de {} impossible : {e}", folder.display()))?;
     if !same_path(&me, &target) {
         std::fs::copy(&me, &target).map_err(|e| format!("Copie vers {} impossible : {e}", target.display()))?;
     }
 
     let mut settings = read_settings()?;
-    // Première installation : les extensions vont à côté de BetterClaude, dans `Extensions\`.
+    // Première installation : les extensions vont à côté d'ExtraClaude, dans `Extensions\`.
     let mut state = betterext::State::load();
     if state.extensions_dir.is_none() && !betterext::extensions_dir().exists() {
         state.extensions_dir = Some(folder.join("Extensions").to_string_lossy().into());
@@ -140,7 +140,7 @@ pub fn install(folder: &str) -> Result<PathBuf, String> {
     Ok(target)
 }
 
-/// Débranche BetterClaude : plus aucune extension ne démarre avec Claude.
+/// Débranche ExtraClaude : plus aucune extension ne démarre avec Claude.
 pub fn uninstall() -> Result<(), String> {
     let mut settings = read_settings()?;
     edit_hooks(&mut settings, is_ours, &[])?;

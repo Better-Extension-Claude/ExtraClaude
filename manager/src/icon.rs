@@ -1,4 +1,4 @@
-//! Le logo de BetterClaude : une pièce de puzzle couleur Claude, une étoile rayonnante
+//! Le logo d'ExtraClaude : une pièce de puzzle couleur Claude, une étoile rayonnante
 //! blanche au centre. Dessiné ici (pas de fichier image) : icône de la fenêtre, et icône de
 //! l'exe, que `build.sh` y écrit avec `--embed-icon`.
 

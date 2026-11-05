@@ -1,5 +1,5 @@
-//! Thème partagé par BetterClaude et toutes ses extensions : clair ou sombre (ou comme Claude),
-//! et les couleurs de chacun, réglables dans BetterClaude → Réglages → Apparence.
+//! Thème partagé par ExtraClaude et toutes ses extensions : clair ou sombre (ou comme Claude),
+//! et les couleurs de chacun, réglables dans ExtraClaude → Réglages → Apparence.
 //! Enregistré dans `%LOCALAPPDATA%\BetterExt\theme.json` ; les extensions le relisent seules.
 //!
 //! Une extension qui dessine : `let p = betterext::theme::current();` puis `p.fond`, `p.texte`…
@@ -164,7 +164,7 @@ impl Theme {
             .unwrap_or_default()
     }
 
-    /// Enregistre le thème : BetterClaude et les extensions le prennent aussitôt (≤ 1 s).
+    /// Enregistre le thème : ExtraClaude et les extensions le prennent aussitôt (≤ 1 s).
     pub fn save(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(crate::data_dir())?;
         std::fs::write(path(), serde_json::to_string_pretty(self).unwrap_or_default() + "\n")?;
