@@ -298,8 +298,9 @@ struct App {
     self_latest: Option<Result<Option<String>, String>>,
     self_checking: bool,
     self_updating: bool,
-    /// « Vérifier les mises à jour » cliqué : un message une fois les deux vérifications faites.
-    manual_check: bool,
+    /// « Vérifier les mises à jour » cliqué (Mes extensions / Réglages) : un message à la fin.
+    check_extensions: bool,
+    check_self_asked: bool,
 }
 
 impl App {
@@ -326,7 +327,8 @@ impl App {
             self_latest: None,
             self_checking: false,
             self_updating: false,
-            manual_check: false,
+            check_extensions: false,
+            check_self_asked: false,
         };
         app.check_self(&ctx);
         app.fetch(ctx);
@@ -424,13 +426,6 @@ impl App {
         self.rows.iter().filter_map(|r| self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref())).collect()
     }
 
-    fn update_extensions(&mut self, updates: Vec<Remote>, ctx: &egui::Context) {
-        if self.installing.is_none() && !updates.is_empty() {
-            self.installing = Some(String::new());
-            self.spawn(ctx, move || Job::UpdatedAll(updates.iter().map(discover::install).collect()));
-        }
-    }
-
     fn update_self(&mut self, version: String, ctx: &egui::Context) {
         if !self.self_updating {
             self.self_updating = true;
@@ -438,25 +433,38 @@ impl App {
         }
     }
 
-    /// Fin de « Vérifier les mises à jour » : ce qui est disponible, en une phrase.
-    fn finish_check(&mut self) {
-        if !self.manual_check || self.fetching || self.self_checking {
+    /// Fin de « Vérifier les mises à jour » dans Mes extensions.
+    fn finish_extensions_check(&mut self) {
+        if !self.check_extensions {
             return;
         }
-        self.manual_check = false;
-        let mut found: Vec<String> = Vec::new();
-        match &self.self_latest {
-            Some(Ok(Some(v))) => found.push(format!("BetterClaude {v}")),
-            Some(Err(e)) => {
-                let e = e.clone();
-                self.report(Err(e));
-                return;
-            }
-            _ => {}
+        self.check_extensions = false;
+        if let Some(Err(e)) = &self.remotes {
+            let e = e.clone();
+            self.report(Err(e));
+            return;
         }
-        found.extend(self.extension_updates().iter().map(|r| format!("{} {}", r.manifest.name, r.version)));
-        let text = if found.is_empty() { "Tout est à jour.".to_string() } else { format!("Mises à jour disponibles : {}.", found.join(", ")) };
+        let found: Vec<String> = self.extension_updates().iter().map(|r| format!("{} {}", r.manifest.name, r.version)).collect();
+        let text = if found.is_empty() {
+            "Vos extensions sont à jour.".to_string()
+        } else {
+            format!("Mises à jour disponibles : {}.", found.join(", "))
+        };
         self.report(Ok(text));
+    }
+
+    /// Fin de « Vérifier les mises à jour » dans Réglages (BetterClaude).
+    fn finish_self_check(&mut self) {
+        if !self.check_self_asked {
+            return;
+        }
+        self.check_self_asked = false;
+        let result = match &self.self_latest {
+            Some(Ok(Some(v))) => Ok(format!("BetterClaude {v} est disponible.")),
+            Some(Err(e)) => Err(e.clone()),
+            _ => Ok("BetterClaude est à jour.".to_string()),
+        };
+        self.report(result);
     }
 
     fn install_remote(&mut self, remote: Remote, ctx: &egui::Context) {
@@ -472,16 +480,12 @@ impl App {
                 Job::Fetched(result) => {
                     self.fetching = false;
                     self.remotes = Some(result);
-                    if self.state.auto_update() {
-                        let updates = self.extension_updates();
-                        self.update_extensions(updates, ctx);
-                    }
-                    self.finish_check();
+                    self.finish_extensions_check();
                 }
                 Job::SelfChecked(result) => {
                     self.self_checking = false;
                     self.self_latest = Some(result);
-                    self.finish_check();
+                    self.finish_self_check();
                 }
                 Job::SelfUpdated(result) => {
                     self.self_updating = false;
@@ -691,15 +695,25 @@ impl App {
             .iter()
             .filter_map(|r| self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref()))
             .collect();
-        if !updates.is_empty() {
+        if !self.rows.is_empty() {
             ui.horizontal(|ui| {
-                let n = updates.len();
-                ui.label(format!("{n} mise{} à jour disponible{}.", if n > 1 { "s" } else { "" }, if n > 1 { "s" } else { "" }));
-                let label = if self.installing.is_some() { "Mise à jour…" } else { "Tout mettre à jour" };
-                if ui.add_enabled(self.installing.is_none(), primary(label)).clicked() {
-                    self.installing = Some(String::new());
-                    self.spawn(&ui.ctx().clone(), move || Job::UpdatedAll(updates.iter().map(discover::install).collect()));
+                if !updates.is_empty() {
+                    let n = updates.len();
+                    ui.label(format!("{n} mise{} à jour disponible{}.", if n > 1 { "s" } else { "" }, if n > 1 { "s" } else { "" }));
+                    let label = if self.installing.is_some() { "Mise à jour…" } else { "Tout mettre à jour" };
+                    if ui.add_enabled(self.installing.is_none(), primary(label)).clicked() {
+                        self.installing = Some(String::new());
+                        self.spawn(&ui.ctx().clone(), move || Job::UpdatedAll(updates.iter().map(discover::install).collect()));
+                    }
                 }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let busy = self.fetching;
+                    let label = if busy { "Vérification…" } else { "Vérifier les mises à jour" };
+                    if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
+                        self.check_extensions = true;
+                        self.fetch(ui.ctx().clone());
+                    }
+                });
             });
             ui.add_space(4.0);
         }
@@ -1045,18 +1059,11 @@ impl App {
                 self.state.self_update = Some(self_update);
                 self.save_state();
             }
-            let mut auto_update = self.state.auto_update();
-            if ui.checkbox(&mut auto_update, "Mettre à jour les extensions automatiquement").changed() {
-                self.state.auto_update = Some(auto_update);
-                self.save_state();
-            }
-            let busy = self.manual_check || self.fetching || self.self_checking;
+            let busy = self.self_checking;
             let label = if busy { "Vérification…" } else { "Vérifier les mises à jour" };
             if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
-                self.manual_check = true;
-                let ctx = ui.ctx().clone();
-                self.check_self(&ctx);
-                self.fetch(ctx);
+                self.check_self_asked = true;
+                self.check_self(&ui.ctx().clone());
             }
         });
 

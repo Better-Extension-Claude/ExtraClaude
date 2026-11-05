@@ -139,14 +139,11 @@ pub fn installed() -> Vec<Extension> {
 }
 
 /// `state.json` : extensions activées (une extension absente de la liste est activée),
-/// mises à jour automatiques et dossier des extensions.
+/// mise à jour automatique de BetterClaude et dossier des extensions.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
     pub enabled: BTreeMap<String, bool>,
-    /// Mises à jour automatiques des extensions installées (activées si absent).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auto_update: Option<bool>,
     /// Mises à jour automatiques de BetterClaude lui-même (activées si absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub self_update: Option<bool>,
@@ -171,10 +168,6 @@ impl State {
 
     pub fn is_enabled(&self, id: &str) -> bool {
         self.enabled.get(id).copied().unwrap_or(true)
-    }
-
-    pub fn auto_update(&self) -> bool {
-        self.auto_update.unwrap_or(true)
     }
 
     pub fn self_update(&self) -> bool {

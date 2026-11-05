@@ -1,5 +1,4 @@
-//! Mises à jour : BetterClaude lui-même (dernière release du dépôt BetterClaude) et les
-//! extensions installées.
+//! Mise à jour de BetterClaude lui-même (dernière release du dépôt BetterClaude).
 //!
 //! BetterClaude se remplace sur place : la nouvelle version est téléchargée à côté
 //! (`BetterClaude.new.exe`), l'exe en marche est renommé `BetterClaude.old.exe` (Windows
@@ -97,17 +96,13 @@ pub fn restart_button(exe: &Path) {
     }
 }
 
-/// Mises à jour automatiques, depuis le bouton puzzle : BetterClaude puis les extensions,
-/// au démarrage puis toutes les 6 heures.
+/// Mise à jour automatique de BetterClaude, depuis le bouton puzzle : au démarrage puis
+/// toutes les 6 heures. Les extensions, elles, ne se mettent à jour que sur demande.
 pub fn watch() {
     std::thread::spawn(|| loop {
         // Laisse Claude et les extensions démarrer d'abord.
         std::thread::sleep(Duration::from_secs(20));
-        let state = betterext::State::load();
-        if state.auto_update() {
-            update_extensions();
-        }
-        if state.self_update() && installed_self().is_some() {
+        if betterext::State::load().self_update() && installed_self().is_some() {
             if let Ok(Some(version)) = available() {
                 if let Ok(exe) = apply(&version) {
                     // Ce bouton est l'ancienne version : la nouvelle prend sa place.
@@ -118,20 +113,4 @@ pub fn watch() {
         }
         std::thread::sleep(Duration::from_secs(6 * 3600));
     });
-}
-
-/// Installe les mises à jour publiées des extensions installées. Renvoie les noms mis à jour.
-pub fn update_extensions() -> Vec<String> {
-    let Ok(remotes) = discover::fetch() else { return Vec::new() };
-    let installed = betterext::installed();
-    let mut done = Vec::new();
-    for remote in remotes {
-        let Some(local) = installed.iter().find(|e| e.manifest.id == remote.manifest.id) else { continue };
-        if discover::is_newer(&remote.version, local.manifest.version.as_deref().unwrap_or("0")) {
-            if let Ok(m) = discover::install(&remote) {
-                done.push(m.name);
-            }
-        }
-    }
-    done
 }
