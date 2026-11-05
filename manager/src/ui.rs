@@ -125,7 +125,9 @@ fn setup_style(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
     reload_theme();
     apply_theme(ctx);
-    ctx.style_mut(|s| {
+    // Les deux thèmes d'egui (il suit le réglage « applications » de Windows) : sinon, en mode
+    // clair, boutons et textes reprennent la taille par défaut.
+    ctx.all_styles_mut(|s| {
         s.spacing.item_spacing = vec2(8.0, 8.0);
         s.spacing.button_padding = vec2(12.0, 6.0);
         s.spacing.interact_size.y = 30.0;
@@ -156,7 +158,10 @@ fn apply_theme(ctx: &egui::Context) {
     v.window_stroke = Stroke::new(1.0_f32, BORDER());
     v.window_rounding = Rounding::same(10.0);
     v.menu_rounding = Rounding::same(8.0);
-    ctx.set_visuals(v);
+    // egui suit le thème de Windows : sous Windows en mode clair, il prendrait ses propres
+    // couleurs claires (boutons gris « Windows »). Nos couleurs valent pour ses deux thèmes.
+    ctx.set_visuals_of(egui::Theme::Dark, v.clone());
+    ctx.set_visuals_of(egui::Theme::Light, v);
 }
 
 /// Croix de fermeture : fond rouge et croix blanche au survol, comme celle de Windows.
