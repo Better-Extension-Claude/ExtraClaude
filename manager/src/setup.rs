@@ -24,12 +24,7 @@ fn command_of(hook: &Value) -> &str {
 }
 
 fn is_ours(hook: &Value) -> bool {
-    let c = command_of(hook).to_lowercase();
-    ["betterclaude.exe", "betterext.exe", "claudeext.exe"].iter().any(|name| c.contains(name))
-}
-
-fn is_gitpush(hook: &Value) -> bool {
-    command_of(hook).to_lowercase().contains("gitpush.exe")
+    command_of(hook).to_lowercase().contains("betterclaude.exe")
 }
 
 /// Exe d'une commande de hook : `"C:/…/x.exe" --arg` ou `C:/…/x.exe`.
@@ -113,15 +108,8 @@ fn edit_hooks(settings: &mut Value, drop: impl Fn(&Value) -> bool, add: &[(&str,
     Ok(())
 }
 
-fn write_manifest(manifest: &Manifest) -> Result<(), String> {
-    let dir = extensions_dir().join(betterext::folder_name(manifest));
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let text = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())?;
-    std::fs::write(dir.join("extension.json"), text + "\n").map_err(|e| e.to_string())
-}
 
-/// Copie BetterClaude.exe dans `folder`, branche ses hooks sur tous les événements de Claude
-/// et reprend GitPush : son hook est retiré, il devient l'extension « gitpush ».
+/// Copie BetterClaude.exe dans `folder` et branche ses hooks sur tous les événements de Claude.
 pub fn install(folder: &str) -> Result<PathBuf, String> {
     let folder = PathBuf::from(folder.trim());
     if folder.as_os_str().is_empty() {
@@ -135,23 +123,6 @@ pub fn install(folder: &str) -> Result<PathBuf, String> {
     }
 
     let mut settings = read_settings()?;
-    // GitPush installé : par son hook, sinon à son emplacement par défaut.
-    let gitpush = all_hooks(&settings)
-        .find(|h| is_gitpush(h))
-        .map(|h| exe_in(command_of(h)))
-        .or_else(|| Some(Path::new(&std::env::var("LOCALAPPDATA").ok()?).join("GitPush").join("GitPush.exe")));
-    if let Some(exe) = gitpush.filter(|p| p.exists()) {
-        if !betterext::installed().iter().any(|e| e.manifest.id == "gitpush") {
-            write_manifest(&Manifest {
-                id: "gitpush".into(),
-                name: "GitPush".into(),
-                description: Some("Envoyez votre projet sur GitHub en un clic, sans passer par Claude.".into()),
-                exe: exe.to_string_lossy().into(),
-                start: Some(vec!["--button".into()]),
-                ..Default::default()
-            })?;
-        }
-    }
     // Première installation : les extensions vont à côté de BetterClaude, dans `Extensions\`.
     let mut state = betterext::State::load();
     if state.extensions_dir.is_none() && !betterext::extensions_dir().exists() {
@@ -160,20 +131,8 @@ pub fn install(folder: &str) -> Result<PathBuf, String> {
     }
     let command = format!("\"{}\" --hook", target.to_string_lossy().replace('\\', "/"));
     let add: Vec<(&str, String)> = EVENTS.iter().map(|e| (*e, command.clone())).collect();
-    edit_hooks(&mut settings, |h| is_ours(h) || is_gitpush(h), &add)?;
+    edit_hooks(&mut settings, is_ours, &add)?;
     write_settings(&settings)?;
-    // BetterClaude s'est appelé ClaudeExt puis BetterExt : les anciennes copies ne servent plus.
-    let programs = Path::new(&std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Programs");
-    for name in ["ClaudeExt", "BetterExt"] {
-        let old = programs.join(name);
-        if old.exists() && !same_path(&old, &folder) {
-            for exe in ["ClaudeExt.exe", "BetterExt.exe", "BetterClaude.exe"] {
-                process::kill_all(&old.join(exe));
-            }
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            let _ = std::fs::remove_dir_all(&old);
-        }
-    }
     // Le bouton puzzle tout de suite, sans attendre la prochaine session.
     if betterext::claude::is_open() {
         let _ = process::spawn_detached(&target, &["--button".to_string()]);
@@ -224,7 +183,7 @@ pub fn add_extension(manifest_path: &Path) -> Result<Manifest, String> {
     if same_path(source, &dest) {
         return Ok(manifest);
     }
-    if let Some(old) = betterext::installed().into_iter().find(|e| e.manifest.id == manifest.id && !e.linked) {
+    if let Some(old) = betterext::installed().into_iter().find(|e| e.manifest.id == manifest.id) {
         // Un exe en marche est verrouillé : on attend que ses processus soient fermés.
         let exe = old.exe_path();
         process::kill_all(&exe);
@@ -253,7 +212,7 @@ pub fn move_extensions(new_dir: &Path) -> Result<usize, String> {
         return Err("Choisissez un dossier qui n'est pas à l'intérieur du dossier actuel.".into());
     }
     std::fs::create_dir_all(new_dir).map_err(|e| format!("Impossible de créer {} : {e}", new_dir.display()))?;
-    let installed: Vec<Extension> = betterext::installed().into_iter().filter(|e| !e.linked).collect();
+    let installed: Vec<Extension> = betterext::installed();
     // Fermées d'abord : un exe en marche ne peut pas être déplacé.
     let was_running: Vec<String> =
         installed.iter().filter(|e| process::is_running(&e.exe_path())).map(|e| e.manifest.id.clone()).collect();
@@ -288,18 +247,8 @@ pub fn move_extensions(new_dir: &Path) -> Result<usize, String> {
     Ok(moved)
 }
 
-/// Ferme l'extension et retire son dossier (un exe hors du dossier, comme GitPush repris,
-/// reste en place).
-/// Une extension d'un dossier surveillé est seulement retirée de la liste : son dossier (un
-/// projet en cours, souvent) reste sur le disque. Réglages → Dossiers surveillés la remet.
+/// Ferme l'extension et retire son dossier.
 pub fn remove_extension(ext: &Extension) -> Result<(), String> {
     process::kill_all(&ext.exe_path());
-    if ext.linked {
-        let mut state = betterext::State::load();
-        if !state.hidden.contains(&ext.manifest.id) {
-            state.hidden.push(ext.manifest.id.clone());
-        }
-        return state.save().map_err(|e| format!("Réglage non enregistré : {e}"));
-    }
     std::fs::remove_dir_all(&ext.dir).map_err(|e| format!("Suppression impossible : {e}"))
 }

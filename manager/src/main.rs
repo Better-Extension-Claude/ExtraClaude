@@ -15,8 +15,6 @@ mod ui;
 /// - `--install-to <dossier>` : installation sans fenêtre (hooks compris) ;
 /// - sans argument : la fenêtre (extensions, Découverte, installation).
 fn main() {
-    betterext::migrate_from_claudeext();
-    betterext::migrate_extensions();
     let args: Vec<String> = std::env::args().collect();
     let has = |flag: &str| args.iter().any(|a| a == flag);
     if has("--hook") {

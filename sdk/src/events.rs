@@ -1,4 +1,4 @@
-//! Événements de Claude, de BetterExt vers une extension : un pipe nommé par extension,
+//! Événements de Claude, de BetterClaude vers une extension : un pipe nommé par extension,
 //! `\\.\pipe\betterext-<id>`. Chaque connexion porte un événement, le JSON du hook de
 //! Claude sur une ligne (champ `hook_event_name`, `session_id`, `cwd`, `tool_name`…).
 

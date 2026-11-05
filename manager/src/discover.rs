@@ -218,7 +218,7 @@ pub fn install(remote: &Remote) -> Result<Manifest, String> {
         std::fs::write(staging.join(&file.name), bytes).map_err(|e| e.to_string())?;
     }
     let dest = extensions_dir().join(betterext::folder_name(&remote.manifest));
-    let old = betterext::installed().into_iter().find(|e| &e.manifest.id == id && !e.linked);
+    let old = betterext::installed().into_iter().find(|e| &e.manifest.id == id);
     if let Some(old) = &old {
         // Un exe en marche est verrouillé : on attend que ses processus soient fermés.
         let exe = old.exe_path();

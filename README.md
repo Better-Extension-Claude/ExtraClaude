@@ -37,8 +37,6 @@ votre compte Windows.
 | Extension | Ce qu'elle fait |
 |---|---|
 | [GitPush](https://github.com/Better-Extension-Claude/GitPush) | Envoyez votre projet sur GitHub en un clic, sans passer par Claude. |
-| CMD Buddy | Un compagnon pour retrouver vos commandes plus vite et garder vos favorites sous la main. |
-| Download Progress | Suivez l'avancée de vos téléchargements directement dans la discussion. |
 
 ---
 
@@ -71,11 +69,11 @@ Une extension est un dossier qui contient `extension.json` et son exe :
 
 ```json
 {
-  "id": "download-progress",
-  "name": "Download Progress",
+  "id": "mon-extension",
+  "name": "Mon extension",
   "version": "1.0.0",
-  "description": "Suivez l'avancée de vos téléchargements directement dans la discussion.",
-  "exe": "download-progress.exe",
+  "description": "Ce que l'extension apporte, en une phrase.",
+  "exe": "mon-extension.exe",
   "start": [],
   "events": ["PreToolUse", "PostToolUse"]
 }
@@ -92,8 +90,8 @@ Une extension est un dossier qui contient `extension.json` et son exe :
 Le crate `sdk` (`betterext`) fournit le nécessaire :
 
 ```rust
-betterext::process::single_instance("Local\\download-progress");
-betterext::events::listen("download-progress", |event| { /* serde_json::Value */ });
+betterext::process::single_instance("Local\\mon-extension");
+betterext::events::listen("mon-extension", |event| { /* serde_json::Value */ });
 let (rect, scale) = betterext::claude::rect().unwrap(); // fenêtre de Claude
 let palette = betterext::theme::current();               // couleurs du thème choisi
 ```
@@ -119,6 +117,7 @@ fichiers sont `extension.json` et l'exe (plus ce dont l'extension a besoin). L'o
 Découverte la trouve grâce à `extension.json`, et l'installation copie tous les fichiers
 de la release.
 
-Ajoutez ensuite le dépôt à [`catalogue.json`](catalogue.json) : c'est la liste de l'onglet
-Découverte. Une extension privée peut y figurer : elle ne s'affiche que pour les comptes
-qui y ont accès. `BetterClaude.exe --discover` affiche ce que voit l'onglet Découverte.
+Une extension publique s'ajoute ensuite à [`catalogue.json`](catalogue.json), la liste
+de l'onglet Découverte. Une extension privée n'y va pas : elle s'affiche d'elle-même pour
+les comptes GitHub qui y ont accès. `BetterClaude.exe --discover` affiche ce que voit
+l'onglet Découverte.

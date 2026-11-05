@@ -1,5 +1,3 @@
 [
-  { "repo": "Better-Extension-Claude/GitPush" },
-  { "repo": "Better-Extension-Claude/cmd-buddy" },
-  { "repo": "Better-Extension-Claude/download-progress" }
+  { "repo": "Better-Extension-Claude/GitPush" }
 ]

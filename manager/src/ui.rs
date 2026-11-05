@@ -317,8 +317,7 @@ impl App {
         app.fetch(ctx);
         app.refresh();
         if let Some(exe) = &app.hooked {
-            // Les anciens dossiers (ClaudeExt, BetterExt) ne sont pas proposés : l'installation les remplace.
-            if let Some(dir) = exe.parent().filter(|d| !d.ends_with("ClaudeExt") && !d.ends_with("BetterExt")) {
+            if let Some(dir) = exe.parent() {
                 app.folder = dir.to_string_lossy().into();
             }
         }
@@ -573,7 +572,7 @@ impl App {
             let updates = self
                 .rows
                 .iter()
-                .filter(|r| !r.ext.linked && self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref()).is_some())
+                .filter(|r| self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref()).is_some())
                 .count();
             let mine = if updates > 0 { format!("Mes extensions ({updates})") } else { "Mes extensions".to_string() };
             if tab(ui, &mine, self.tab == Tab::Mine).clicked() {
@@ -606,7 +605,6 @@ impl App {
         let updates: Vec<Remote> = self
             .rows
             .iter()
-            .filter(|r| !r.ext.linked)
             .filter_map(|r| self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref()))
             .collect();
         if !updates.is_empty() {
@@ -630,7 +628,7 @@ impl App {
         for (i, row) in self.rows.iter().enumerate() {
             let m = &row.ext.manifest;
             let enabled = self.state.is_enabled(&m.id);
-            let newer = (!row.ext.linked).then(|| self.update_for(&m.id, m.version.as_deref())).flatten();
+            let newer = self.update_for(&m.id, m.version.as_deref());
             card(ui, |ui| {
                 ui.horizontal(|ui| {
                     let mut on = enabled;
@@ -662,7 +660,7 @@ impl App {
                             }
                             return;
                         }
-                        if !row.ext.linked && ui.button("Désinstaller").clicked() {
+                        if ui.button("Désinstaller").clicked() {
                             self.confirm_remove = Some(m.id.clone());
                         }
                         if ui.button("Dossier").clicked() {
@@ -699,9 +697,6 @@ impl App {
                 });
                 if let Some(d) = &m.description {
                     ui.label(RichText::new(d).color(SUBTLE()));
-                }
-                if row.ext.linked {
-                    ui.label(RichText::new("Fichiers source").color(SUBTLE()).small()).on_hover_text(row.ext.dir.display().to_string());
                 }
             });
         }
@@ -747,7 +742,7 @@ impl App {
         let mut install: Option<Remote> = None;
         for remote in remotes {
             let m = &remote.manifest;
-            let local = self.rows.iter().find(|r| r.ext.manifest.id == m.id && !r.ext.linked);
+            let local = self.rows.iter().find(|r| r.ext.manifest.id == m.id);
             card(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(&m.name).font(bold(15.5)));
