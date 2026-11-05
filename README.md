@@ -22,7 +22,10 @@ Sans lui, les extensions ne démarrent pas.
   - où sont rangées les extensions (par défaut `%USERPROFILE%\BetterClaude\Extensions`).
     Changer de dossier y déplace les extensions ;
   - l'apparence : comme Claude, clair ou sombre, et chaque couleur des deux thèmes.
-    Toutes les extensions suivent ce réglage.
+    Toutes les extensions suivent ce réglage ;
+  - les mises à jour : BetterClaude et les extensions se mettent à jour tout seuls (à
+    l'ouverture de Claude, puis toutes les 6 heures). Chacun peut être décoché ; **Mettre à
+    jour** et **Vérifier les mises à jour** restent disponibles.
 
 Une extension activée démarre avec Claude et se ferme avec lui. Une extension désactivée
 ne démarre plus.

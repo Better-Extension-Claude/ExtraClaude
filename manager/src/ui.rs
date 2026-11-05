@@ -257,6 +257,10 @@ enum Job {
     LoggedIn(Result<Session, String>),
     DevLoaded(Result<Vec<ManagedRepo>, String>),
     DevDone(Result<String, String>),
+    /// Nouvelle version de BetterClaude publiée (None : à jour).
+    SelfChecked(Result<Option<String>, String>),
+    /// BetterClaude remplacé par la nouvelle version : son exe.
+    SelfUpdated(Result<std::path::PathBuf, String>),
 }
 
 /// Invitation en cours de saisie, pour un dépôt du panneau dev.
@@ -290,6 +294,12 @@ struct App {
     dev_busy: bool,
     invites: HashMap<String, Invite>,
     jobs: (Sender<Job>, Receiver<Job>),
+    /// Dernière vérification de BetterClaude : None tant qu'elle n'est pas finie.
+    self_latest: Option<Result<Option<String>, String>>,
+    self_checking: bool,
+    self_updating: bool,
+    /// « Vérifier les mises à jour » cliqué : un message une fois les deux vérifications faites.
+    manual_check: bool,
 }
 
 impl App {
@@ -313,7 +323,12 @@ impl App {
             dev_busy: false,
             invites: HashMap::new(),
             jobs: channel(),
+            self_latest: None,
+            self_checking: false,
+            self_updating: false,
+            manual_check: false,
         };
+        app.check_self(&ctx);
         app.fetch(ctx);
         app.refresh();
         if let Some(exe) = &app.hooked {
@@ -397,6 +412,53 @@ impl App {
         }
     }
 
+    fn check_self(&mut self, ctx: &egui::Context) {
+        if !self.self_checking {
+            self.self_checking = true;
+            self.spawn(ctx, || Job::SelfChecked(crate::update::available()));
+        }
+    }
+
+    /// Mises à jour des extensions installées, d'après la dernière lecture de Découverte.
+    fn extension_updates(&self) -> Vec<Remote> {
+        self.rows.iter().filter_map(|r| self.update_for(&r.ext.manifest.id, r.ext.manifest.version.as_deref())).collect()
+    }
+
+    fn update_extensions(&mut self, updates: Vec<Remote>, ctx: &egui::Context) {
+        if self.installing.is_none() && !updates.is_empty() {
+            self.installing = Some(String::new());
+            self.spawn(ctx, move || Job::UpdatedAll(updates.iter().map(discover::install).collect()));
+        }
+    }
+
+    fn update_self(&mut self, version: String, ctx: &egui::Context) {
+        if !self.self_updating {
+            self.self_updating = true;
+            self.spawn(ctx, move || Job::SelfUpdated(crate::update::apply(&version)));
+        }
+    }
+
+    /// Fin de « Vérifier les mises à jour » : ce qui est disponible, en une phrase.
+    fn finish_check(&mut self) {
+        if !self.manual_check || self.fetching || self.self_checking {
+            return;
+        }
+        self.manual_check = false;
+        let mut found: Vec<String> = Vec::new();
+        match &self.self_latest {
+            Some(Ok(Some(v))) => found.push(format!("BetterClaude {v}")),
+            Some(Err(e)) => {
+                let e = e.clone();
+                self.report(Err(e));
+                return;
+            }
+            _ => {}
+        }
+        found.extend(self.extension_updates().iter().map(|r| format!("{} {}", r.manifest.name, r.version)));
+        let text = if found.is_empty() { "Tout est à jour.".to_string() } else { format!("Mises à jour disponibles : {}.", found.join(", ")) };
+        self.report(Ok(text));
+    }
+
     fn install_remote(&mut self, remote: Remote, ctx: &egui::Context) {
         if self.installing.is_none() {
             self.installing = Some(remote.manifest.id.clone());
@@ -410,6 +472,28 @@ impl App {
                 Job::Fetched(result) => {
                     self.fetching = false;
                     self.remotes = Some(result);
+                    if self.state.auto_update() {
+                        let updates = self.extension_updates();
+                        self.update_extensions(updates, ctx);
+                    }
+                    self.finish_check();
+                }
+                Job::SelfChecked(result) => {
+                    self.self_checking = false;
+                    self.self_latest = Some(result);
+                    self.finish_check();
+                }
+                Job::SelfUpdated(result) => {
+                    self.self_updating = false;
+                    match result {
+                        Ok(exe) => {
+                            // La nouvelle version reprend le bouton puzzle et cette fenêtre.
+                            crate::update::restart_button(&exe);
+                            let _ = process::spawn_detached(&exe, &["--relaunch".into()]);
+                            std::process::exit(0);
+                        }
+                        Err(e) => self.report(Err(e)),
+                    }
                 }
                 Job::Installed(result) => {
                     self.installing = None;
@@ -933,6 +1017,47 @@ impl App {
                     self.report(result);
                 }
             });
+        });
+
+        section(ui, "Mises à jour");
+        card(ui, |ui| {
+            let status = match &self.self_latest {
+                _ if self.self_checking => "vérification…".to_string(),
+                Some(Ok(None)) => "à jour".to_string(),
+                Some(Ok(Some(v))) => format!("la version {v} est disponible"),
+                Some(Err(_)) => "impossible de vérifier pour l'instant".to_string(),
+                None => String::new(),
+            };
+            ui.horizontal(|ui| {
+                ui.label(format!("BetterClaude {}", crate::update::current()));
+                ui.label(RichText::new(format!("· {status}")).color(SUBTLE()));
+                if let Some(Ok(Some(v))) = self.self_latest.clone() {
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let label = if self.self_updating { "Mise à jour…".to_string() } else { format!("Mettre à jour (v{v})") };
+                        if ui.add_enabled(!self.self_updating, primary(label)).clicked() {
+                            self.update_self(v, &ui.ctx().clone());
+                        }
+                    });
+                }
+            });
+            let mut self_update = self.state.self_update();
+            if ui.checkbox(&mut self_update, "Mettre à jour BetterClaude automatiquement").changed() {
+                self.state.self_update = Some(self_update);
+                self.save_state();
+            }
+            let mut auto_update = self.state.auto_update();
+            if ui.checkbox(&mut auto_update, "Mettre à jour les extensions automatiquement").changed() {
+                self.state.auto_update = Some(auto_update);
+                self.save_state();
+            }
+            let busy = self.manual_check || self.fetching || self.self_checking;
+            let label = if busy { "Vérification…" } else { "Vérifier les mises à jour" };
+            if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
+                self.manual_check = true;
+                let ctx = ui.ctx().clone();
+                self.check_self(&ctx);
+                self.fetch(ctx);
+            }
         });
 
         section(ui, "Apparence");

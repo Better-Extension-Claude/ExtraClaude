@@ -8,12 +8,16 @@ mod icon;
 mod keys;
 mod setup;
 mod ui;
+mod update;
 
 /// Modes de BetterClaude.exe :
 /// - `--hook` : appelé par Claude à chaque événement (JSON sur l'entrée standard) ;
-/// - `--button` : le bouton puzzle sur Claude, lancé en début de session ;
+/// - `--button` : le bouton puzzle sur Claude, lancé en début de session (il fait aussi les
+///   mises à jour automatiques) ;
 /// - `--install-to <dossier>` : installation sans fenêtre (hooks compris) ;
 /// - sans argument : la fenêtre (extensions, Découverte, installation).
+///
+/// `--relaunch` : relancé après une mise à jour, attend que l'ancienne version se ferme.
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let has = |flag: &str| args.iter().any(|a| a == flag);
@@ -21,10 +25,18 @@ fn main() {
         hook::run();
         return;
     }
+    update::cleanup();
+    let wait = std::time::Duration::from_secs(if has("--relaunch") { 10 } else { 0 });
     if has("--button") {
-        if betterext::process::single_instance(r"Local\BetterClaude-bouton") {
+        if betterext::process::single_instance_wait(r"Local\BetterClaude-bouton", wait) {
+            update::watch();
             button::run();
         }
+        return;
+    }
+    // Diagnostic : version de cet exe et dernière version publiée.
+    if has("--version") {
+        println!("{}\tpubliée : {:?}\tinstallé : {:?}", update::current(), update::latest(), update::installed_self());
         return;
     }
     // build.sh : écrit le logo comme icône de l'exe compilé.
@@ -82,7 +94,7 @@ fn main() {
         let ok = setup::install(args.get(i + 1).map(String::as_str).unwrap_or("")).is_ok();
         std::process::exit(if ok { 0 } else { 1 });
     }
-    if betterext::process::single_instance(r"Local\BetterClaude-fenetre") {
+    if betterext::process::single_instance_wait(r"Local\BetterClaude-fenetre", wait) {
         ui::run();
     } else {
         ui::focus_existing();

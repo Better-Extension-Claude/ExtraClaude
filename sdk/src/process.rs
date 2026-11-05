@@ -20,7 +20,31 @@ pub fn single_instance(name: &str) -> bool {
     let name = crate::wide(name);
     unsafe {
         let h = CreateMutexW(std::ptr::null(), 1, name.as_ptr());
-        !h.is_null() && GetLastError() != ERROR_ALREADY_EXISTS
+        if h.is_null() {
+            return false;
+        }
+        if GetLastError() == ERROR_ALREADY_EXISTS {
+            // Pas gardé : sinon le verrou survit à son premier propriétaire, et une nouvelle
+            // tentative (relance après une mise à jour) échouerait toujours.
+            CloseHandle(h);
+            return false;
+        }
+        true
+    }
+}
+
+/// [`single_instance`], en réessayant jusqu'à `wait` : le temps que l'instance précédente
+/// (relancée après une mise à jour) se ferme.
+pub fn single_instance_wait(name: &str, wait: std::time::Duration) -> bool {
+    let end = std::time::Instant::now() + wait;
+    loop {
+        if single_instance(name) {
+            return true;
+        }
+        if std::time::Instant::now() >= end {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 }
 

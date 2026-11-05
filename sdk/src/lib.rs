@@ -147,6 +147,9 @@ pub struct State {
     /// Mises à jour automatiques des extensions installées (activées si absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_update: Option<bool>,
+    /// Mises à jour automatiques de BetterClaude lui-même (activées si absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub self_update: Option<bool>,
     /// Dossier des extensions installées ([`extensions_dir`]) ; absent : celui par défaut.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extensions_dir: Option<String>,
@@ -172,6 +175,10 @@ impl State {
 
     pub fn auto_update(&self) -> bool {
         self.auto_update.unwrap_or(true)
+    }
+
+    pub fn self_update(&self) -> bool {
+        self.self_update.unwrap_or(true)
     }
 }
 
