@@ -484,8 +484,18 @@ impl App {
                 }
                 Job::SelfChecked(result) => {
                     self.self_checking = false;
+                    // Vérification de l'ouverture de la fenêtre (pas un clic) : mise à jour
+                    // automatique si elle est réglée.
+                    let opening = !self.check_self_asked;
+                    let newer = result.as_ref().ok().cloned().flatten();
                     self.self_latest = Some(result);
                     self.finish_self_check();
+                    if let Some(v) = newer.filter(|_| opening && self.state.self_update()) {
+                        if crate::update::installed_self().is_some() {
+                            self.report(Ok(format!("Mise à jour de BetterClaude vers la version {v}…")));
+                            self.update_self(v, ctx);
+                        }
+                    }
                 }
                 Job::SelfUpdated(result) => {
                     self.self_updating = false;

@@ -23,8 +23,8 @@ Sans lui, les extensions ne démarrent pas.
     Changer de dossier y déplace les extensions ;
   - l'apparence : comme Claude, clair ou sombre, et chaque couleur des deux thèmes.
     Toutes les extensions suivent ce réglage ;
-  - les mises à jour de BetterClaude : il se met à jour tout seul (à l'ouverture de Claude,
-    puis toutes les 6 heures). Ça peut se décocher ; **Mettre à jour** et **Vérifier les mises
+  - les mises à jour de BetterClaude : il se met à jour tout seul (à l'ouverture de Claude
+    et de la fenêtre BetterClaude). Ça peut se décocher ; **Mettre à jour** et **Vérifier les mises
     à jour** restent disponibles.
 
 Les extensions ne se mettent à jour que quand vous le demandez : **Vérifier les mises à

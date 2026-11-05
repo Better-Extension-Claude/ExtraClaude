@@ -5,7 +5,7 @@
 //! permet de renommer un exe en marche, pas de l'écraser), puis la nouvelle prend sa place.
 //! L'ancienne copie est effacée au lancement suivant.
 //!
-//! Automatique : le bouton puzzle vérifie au démarrage de Claude puis toutes les 6 heures.
+//! Automatique : à l'ouverture de Claude (bouton puzzle) et à l'ouverture de la fenêtre BetterClaude.
 
 use crate::{discover, github, setup};
 use betterext::process;
@@ -96,10 +96,10 @@ pub fn restart_button(exe: &Path) {
     }
 }
 
-/// Mise à jour automatique de BetterClaude, depuis le bouton puzzle : au démarrage puis
-/// toutes les 6 heures. Les extensions, elles, ne se mettent à jour que sur demande.
+/// Mise à jour automatique de BetterClaude, depuis le bouton puzzle, une fois à l'ouverture
+/// de Claude. Les extensions, elles, ne se mettent à jour que sur demande.
 pub fn watch() {
-    std::thread::spawn(|| loop {
+    std::thread::spawn(|| {
         // Laisse Claude et les extensions démarrer d'abord.
         std::thread::sleep(Duration::from_secs(20));
         if betterext::State::load().self_update() && installed_self().is_some() {
@@ -111,6 +111,5 @@ pub fn watch() {
                 }
             }
         }
-        std::thread::sleep(Duration::from_secs(6 * 3600));
     });
 }
