@@ -112,6 +112,22 @@ Une extension est un dossier qui contient `extension.json` et son exe :
 - `events` : événements reçus (`"*"` pour tous) parmi `SessionStart`, `SessionEnd`,
   `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`,
   `SubagentStop`, `PreCompact`. Chacun arrive comme le JSON du hook de Claude, sur une ligne.
+- `settings` (facultatif) : les réglages de l'extension. ExtraClaude affiche un bouton
+  **Paramètres** dans Mes extensions, et les réglages s'ouvrent dans la carte de l'extension :
+
+  ```json
+  "settings": [
+    { "key": "cote", "label": "Côté du panneau", "choices": ["À gauche", "À droite"], "default": "À gauche" },
+    { "key": "sons", "label": "Son à la fin", "default": false },
+    { "key": "placer", "label": "Position de la carte", "button": "Déplacer", "default": false }
+  ]
+  ```
+
+  Avec `choices` : un choix parmi plusieurs ; sans : un interrupteur oui/non ; avec `button` : un
+  bouton d'action (un clic écrit `true`, ExtraClaude se réduit et affiche « En cours… » jusqu'à ce
+  que l'extension remette `false`). L'extension lit les
+  valeurs avec `betterext::settings::text` / `flag` (toutes les 1 à 2 s) et peut les changer
+  elle-même avec `settings::set` : ExtraClaude affiche la nouvelle valeur.
 
 Le crate `sdk` (`betterext`) fournit le nécessaire :
 

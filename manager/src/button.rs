@@ -242,6 +242,9 @@ struct Button {
     is_shown: bool,
     /// Dernière position donnée (x, y, taille) : on ne replace que si elle change.
     placed: (i32, i32, i32),
+    /// Barre latérale de Claude redimensionnée à la souris : dernier déplacement du bouton
+    /// Paramètres. Le puzzle reste caché jusqu'au lâcher, puis réapparaît à sa nouvelle place.
+    resizing: Option<Instant>,
     started: Instant,
     last_seen: Option<Instant>,
     last_window_search: Instant,
@@ -321,11 +324,28 @@ impl Button {
         }
         let gap = (size as f32 / 7.0).round() as i32;
         let (x, y) = (gear.left - size - gap, gear.top);
+        // Bouton Paramètres qui bouge souris enfoncée : la barre latérale est redimensionnée. Le
+        // suivre par à-coups (UI Automation, ~100 ms) est saccadé : caché jusqu'au lâcher.
+        let mouse_down = unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } as u16 & 0x8000 != 0;
+        let moved = (x, y, size) != self.placed;
+        if moved && mouse_down && self.placed.2 != 0 {
+            self.resizing = Some(Instant::now());
+        }
+        let settling = self.resizing.is_some_and(|t| mouse_down || t.elapsed() < Duration::from_millis(150));
+        if settling {
+            // Caché avant de bouger : pas d'image intermédiaire.
+            self.hide("barre latérale de Claude en cours de redimensionnement");
+        } else {
+            self.resizing = None;
+        }
         // Position seulement si elle change ; l'ordre des fenêtres, à part (`order`).
-        if (x, y, size) != self.placed {
+        if moved {
             debug(format!("position ({x}, {y}) taille {size}"));
             unsafe { SetWindowPos(self.hwnd, std::ptr::null_mut(), x, y, size, size, SWP_NOZORDER | SWP_NOACTIVATE) };
             self.placed = (x, y, size);
+        }
+        if settling {
+            return;
         }
         // Affiché par `order`, sauf si une fenêtre recouvre sa place.
         SHOULD_SHOW.store(true, Ordering::SeqCst);
@@ -626,6 +646,7 @@ pub fn run() {
                 is_pressed: false,
                 is_shown: false,
                 placed: (0, 0, 0),
+                resizing: None,
                 started: Instant::now(),
                 last_seen: None,
                 last_window_search: Instant::now() - Duration::from_secs(60),

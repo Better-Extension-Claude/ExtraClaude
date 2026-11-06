@@ -13,6 +13,7 @@
 pub mod claude;
 pub mod events;
 pub mod process;
+pub mod settings;
 pub mod theme;
 
 use serde::{Deserialize, Serialize};
@@ -51,6 +52,50 @@ pub struct Manifest {
     /// Événements de Claude envoyés sur son pipe ; `"*"` pour tous.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<String>,
+    /// Réglages proposés dans ExtraClaude (bouton « Paramètres » de Mes extensions), lus par
+    /// l'extension avec [`settings`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<Setting>,
+}
+
+/// Un réglage d'extension, déclaré dans `extension.json` :
+/// `{ "key": "cote", "label": "Côté du panneau", "choices": ["À gauche", "À droite"], "default": "À gauche" }`
+/// (sans `choices` : un interrupteur, `"default": true` ou `false` ; avec `"button": "Déplacer"` :
+/// un bouton d'action).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Setting {
+    /// Nom de la valeur dans `settings.json`.
+    pub key: String,
+    /// Texte affiché, pour l'utilisateur.
+    pub label: String,
+    /// Choix proposés ; absent : interrupteur oui/non.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<String>,
+    /// Texte d'un bouton d'action (« Déplacer »…) à la place de l'interrupteur : un clic écrit
+    /// `true`, ExtraClaude se réduit et affiche « En cours… », puis l'extension remet `false`
+    /// ([`settings::set`]) quand c'est fini.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub button: Option<String>,
+    /// Valeur par défaut : un des `choices`, ou `true` / `false`.
+    #[serde(default)]
+    pub default: serde_json::Value,
+}
+
+impl Setting {
+    /// Valeur actuelle de ce réglage dans `values` (celles de [`settings::all`]), ou sa valeur
+    /// par défaut si elle manque ou n'est plus valable.
+    pub fn value(&self, values: &serde_json::Map<String, serde_json::Value>) -> serde_json::Value {
+        let stored = values.get(&self.key);
+        if self.choices.is_empty() {
+            let on = stored.and_then(serde_json::Value::as_bool).or(self.default.as_bool()).unwrap_or(false);
+            return serde_json::Value::Bool(on);
+        }
+        let valid = |v: Option<&serde_json::Value>| {
+            v.and_then(serde_json::Value::as_str).filter(|s| self.choices.iter().any(|c| c == s)).map(String::from)
+        };
+        let choice = valid(stored).or_else(|| valid(Some(&self.default))).unwrap_or_else(|| self.choices[0].clone());
+        serde_json::Value::String(choice)
+    }
 }
 
 /// Extension installée : son manifeste et son dossier.

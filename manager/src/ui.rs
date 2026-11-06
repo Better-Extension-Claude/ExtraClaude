@@ -4,7 +4,7 @@
 
 use crate::discover::{self, Remote};
 use crate::github::{self, ManagedRepo, Person, Session};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::{hook, setup};
 use betterext::{claude, process, Extension, Manifest, State};
 use eframe::egui::{
@@ -301,6 +301,8 @@ struct App {
     /// « Vérifier les mises à jour » cliqué (Mes extensions / Réglages) : un message à la fin.
     check_extensions: bool,
     check_self_asked: bool,
+    /// Extensions dont les réglages sont ouverts (bouton « Paramètres »).
+    settings_open: HashSet<String>,
 }
 
 impl App {
@@ -329,6 +331,7 @@ impl App {
             self_updating: false,
             check_extensions: false,
             check_self_asked: false,
+            settings_open: HashSet::new(),
         };
         app.check_self(&ctx);
         app.fetch(ctx);
@@ -733,10 +736,15 @@ impl App {
         let mut toggle_to: Option<(usize, bool)> = None;
         let mut remove: Option<usize> = None;
         let mut update: Option<Remote> = None;
+        let mut flip_settings: Option<String> = None;
+        let mut set_value: Option<(String, String, serde_json::Value)> = None;
+        // Bouton d'action cliqué : ExtraClaude se réduit pour laisser la place sur Claude.
+        let mut minimize = false;
         for (i, row) in self.rows.iter().enumerate() {
             let m = &row.ext.manifest;
             let enabled = self.state.is_enabled(&m.id);
             let newer = self.update_for(&m.id, m.version.as_deref());
+            let settings_open = !m.settings.is_empty() && self.settings_open.contains(&m.id);
             card(ui, |ui| {
                 ui.horizontal(|ui| {
                     let mut on = enabled;
@@ -794,6 +802,17 @@ impl App {
                                 None => self.message = Some((format!("Le dossier de {} est introuvable : réinstallez-la.", m.name), false)),
                             }
                         }
+                        // Seulement si l'extension déclare des réglages (`settings` du manifeste).
+                        if !m.settings.is_empty() {
+                            let button = if settings_open {
+                                egui::Button::new(RichText::new("Paramètres").color(ACCENT())).stroke(Stroke::new(1.0_f32, ACCENT()))
+                            } else {
+                                egui::Button::new("Paramètres")
+                            };
+                            if ui.add(button).clicked() {
+                                flip_settings = Some(m.id.clone());
+                            }
+                        }
                         if let Some(remote) = &newer {
                             let busy = self.installing.as_deref() == Some(m.id.as_str());
                             let label = if busy { "Mise à jour…".to_string() } else { format!("Mettre à jour (v{})", remote.version) };
@@ -806,7 +825,59 @@ impl App {
                 if let Some(d) = &m.description {
                     ui.label(RichText::new(d).color(SUBTLE()));
                 }
+                // Réglages, dans la carte : appliqués dès le clic. Relus à chaque image (et au
+                // moins toutes les 2 s) : un changement fait par l'extension elle-même s'affiche.
+                if settings_open {
+                    ui.add_space(6.0);
+                    let y = ui.cursor().top();
+                    ui.painter().hline(ui.max_rect().x_range(), y, Stroke::new(1.0_f32, BORDER()));
+                    ui.add_space(6.0);
+                    let values = betterext::settings::all(&m.id);
+                    for s in &m.settings {
+                        let current = s.value(&values);
+                        ui.horizontal(|ui| {
+                            ui.set_min_height(28.0);
+                            ui.label(&s.label);
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                if let Some(label) = s.button.as_deref().filter(|_| s.choices.is_empty()) {
+                                    // Action menée par l'extension : « En cours… » tant qu'elle
+                                    // tourne et n'a pas remis la valeur à faux.
+                                    if current.as_bool() == Some(true) && row.running {
+                                        ui.add_enabled(false, egui::Button::new("En cours…"));
+                                    } else if ui.button(label).clicked() {
+                                        set_value = Some((m.id.clone(), s.key.clone(), serde_json::Value::Bool(true)));
+                                        minimize = true;
+                                    }
+                                } else if s.choices.is_empty() {
+                                    let mut on = current.as_bool().unwrap_or(false);
+                                    if toggle(ui, &mut on).changed() {
+                                        set_value = Some((m.id.clone(), s.key.clone(), serde_json::Value::Bool(on)));
+                                    }
+                                } else {
+                                    let chosen = current.as_str().unwrap_or_default();
+                                    for c in s.choices.iter().rev() {
+                                        if ui.selectable_label(c == chosen, c).clicked() && c != chosen {
+                                            set_value = Some((m.id.clone(), s.key.clone(), serde_json::Value::String(c.clone())));
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                    }
+                }
             });
+        }
+        if let Some(id) = flip_settings {
+            if !self.settings_open.remove(&id) {
+                self.settings_open.insert(id);
+            }
+        }
+        if let Some((id, key, value)) = set_value {
+            if let Err(e) = betterext::settings::set(&id, &key, value) {
+                self.message = Some((format!("Réglage non enregistré : {e}"), false));
+            } else if minimize {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            }
         }
         if let Some((i, on)) = toggle_to {
             let ext = self.rows[i].ext.clone();
