@@ -8,9 +8,22 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
 use windows_sys::Win32::System::Threading::{
-    CreateMutexW, OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    CreateMutexW, OpenMutexW, OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE, SYNCHRONIZATION_SYNCHRONIZE,
 };
+
+/// Une instance tient-elle le verrou `name` (`Local\…`) en ce moment ? Sans le prendre.
+pub fn instance_exists(name: &str) -> bool {
+    let name = crate::wide(name);
+    unsafe {
+        let h = OpenMutexW(SYNCHRONIZATION_SYNCHRONIZE, 0, name.as_ptr());
+        if h.is_null() {
+            return false;
+        }
+        CloseHandle(h);
+        true
+    }
+}
 
 const DETACHED_PROCESS: u32 = 0x0000_0008;
 const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;

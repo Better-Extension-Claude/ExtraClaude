@@ -13,10 +13,15 @@ pub fn run() {
     let name = event.get("hook_event_name").and_then(Value::as_str).unwrap_or_default().to_string();
     let active = betterext::active();
     let mut started = Vec::new();
-    if name == "SessionStart" {
-        // Le bouton puzzle (une seule instance : il se ferme seul s'il tourne déjà).
-        if let Ok(me) = std::env::current_exe() {
-            let _ = process::spawn_detached(&me, &["--button".to_string()]);
+    // Début de session, ou puzzle absent alors que Claude travaille (session reprise sans
+    // SessionStart, puzzle fermé entre-temps…) : puzzle et extensions sont (re)lancés au premier
+    // événement venu. Le test du verrou du puzzle est presque gratuit.
+    let button_missing = !process::instance_exists(crate::BUTTON_LOCK);
+    if name == "SessionStart" || button_missing {
+        if button_missing {
+            if let Ok(me) = std::env::current_exe() {
+                let _ = process::spawn_detached(&me, &["--button".to_string()]);
+            }
         }
         started = active.iter().filter(|e| start(e)).map(|e| e.manifest.id.clone()).collect();
     }

@@ -10,6 +10,9 @@ mod setup;
 mod ui;
 mod update;
 
+/// Verrou d'instance unique du bouton puzzle : le hook le teste pour relancer le puzzle s'il manque.
+pub const BUTTON_LOCK: &str = r"Local\ExtraClaude-bouton";
+
 /// Modes d'ExtraClaude.exe :
 /// - `--hook` : appelé par Claude à chaque événement (JSON sur l'entrée standard) ;
 /// - `--button` : le bouton puzzle sur Claude, lancé en début de session (il fait aussi les
@@ -28,7 +31,7 @@ fn main() {
     update::cleanup();
     let wait = std::time::Duration::from_secs(if has("--relaunch") { 10 } else { 0 });
     if has("--button") {
-        if betterext::process::single_instance_wait(r"Local\ExtraClaude-bouton", wait) {
+        if betterext::process::single_instance_wait(BUTTON_LOCK, wait) {
             update::watch();
             button::run();
         }
