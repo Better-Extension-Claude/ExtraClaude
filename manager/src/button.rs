@@ -1,7 +1,8 @@
 //! Le bouton puzzle sur Claude : une petite fenêtre Win32 gardée juste au-dessus de Claude, collée à
-//! gauche de son bouton « Paramètres » (en bas de la barre latérale). Un clic ouvre la
-//! fenêtre ExtraClaude. Le bouton « Paramètres » est trouvé par UI Automation : le puzzle suit
-//! la barre latérale quand on l'élargit, et se cache quand elle est repliée.
+//! gauche du sélecteur « Claude / Code » (en haut de la barre latérale), ou, sur un Claude plus
+//! ancien, de son bouton « Paramètres » (en bas). Un clic ouvre la fenêtre ExtraClaude. L'élément
+//! est trouvé par UI Automation : le puzzle suit la barre latérale quand on l'élargit, et se
+//! cache quand elle est repliée.
 
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -12,7 +13,7 @@ use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
 use windows::Win32::UI::Accessibility::{
     CUIAutomation, IUIAutomation, IUIAutomationElement, TreeScope_Descendants, UIA_ButtonControlTypeId,
-    UIA_ControlTypePropertyId,
+    UIA_ControlTypePropertyId, UIA_RadioButtonControlTypeId,
 };
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
@@ -76,8 +77,18 @@ fn wide(s: &str) -> Vec<u16> {
 /// position ensuite est rapide.
 struct Locator {
     uia: Option<IUIAutomation>,
-    found: Option<IUIAutomationElement>,
+    found: Option<(IUIAutomationElement, Spot)>,
     last_search: Option<Instant>,
+}
+
+/// L'élément de Claude à côté duquel le puzzle se place.
+#[derive(Clone, Copy, PartialEq)]
+enum Spot {
+    /// Claude récent : le sélecteur « Claude / Code » en haut de la barre latérale. Le puzzle
+    /// se met juste à gauche de son premier bouton (discussion).
+    Mode,
+    /// Claude plus ancien : le bouton « Paramètres » en bas de la barre latérale.
+    Settings,
 }
 
 impl Locator {
@@ -94,10 +105,10 @@ impl Locator {
         (r.right > r.left && r.bottom > r.top).then_some(RECT { left: r.left, top: r.top, right: r.right, bottom: r.bottom })
     }
 
-    /// Position du bouton « Paramètres » à l'écran, en pixels.
-    fn settings(&mut self, claude: HWND) -> Option<RECT> {
-        if let Some(r) = self.found.as_ref().and_then(Self::rect_of) {
-            return Some(r);
+    /// Position à l'écran, en pixels, de l'élément de Claude à côté duquel se placer.
+    fn settings(&mut self, claude: HWND) -> Option<(RECT, Spot)> {
+        if let Some(found) = self.found.as_ref().and_then(|(e, spot)| Some((Self::rect_of(e)?, *spot))) {
+            return Some(found);
         }
         self.found = None;
         // Recherche complète (tout l'arbre de Claude) : au plus toutes les 2 s.
@@ -118,6 +129,27 @@ impl Locator {
                 }
             };
             let win = root.CurrentBoundingRectangle().ok()?;
+            // Claude récent : sélecteur « Claude / Code » (boutons radio) en haut de la barre
+            // latérale ; on garde le plus à gauche, celui de la discussion.
+            let radio = uia
+                .CreatePropertyCondition(UIA_ControlTypePropertyId, &windows::core::VARIANT::from(UIA_RadioButtonControlTypeId.0))
+                .ok()?;
+            if let Ok(radios) = root.FindAll(TreeScope_Descendants, &radio) {
+                let mut best: Option<(IUIAutomationElement, RECT)> = None;
+                for i in 0..radios.Length().unwrap_or(0) {
+                    let Ok(e) = radios.GetElement(i) else { continue };
+                    let Some(r) = Self::rect_of(&e) else { continue };
+                    let in_top_bar = r.top < win.top + 70 && r.left < win.left + (win.right - win.left) / 2;
+                    if in_top_bar && best.as_ref().map_or(true, |(_, b)| r.left < b.left) {
+                        best = Some((e, r));
+                    }
+                }
+                if let Some((e, r)) = best {
+                    debug(format!("sélecteur Claude / Code : {:?}", (r.left, r.top, r.right, r.bottom)));
+                    self.found = Some((e, Spot::Mode));
+                    return Some((r, Spot::Mode));
+                }
+            }
             let cond = uia
                 .CreatePropertyCondition(UIA_ControlTypePropertyId, &windows::core::VARIANT::from(UIA_ButtonControlTypeId.0))
                 .ok()?;
@@ -143,8 +175,8 @@ impl Locator {
                     && r.bottom > win.bottom - 90
                     && r.left < win.left + (win.right - win.left) / 2;
                 if is_settings {
-                    self.found = Some(e);
-                    return Some(r);
+                    self.found = Some((e, Spot::Settings));
+                    return Some((r, Spot::Settings));
                 }
             }
         }
@@ -308,11 +340,16 @@ impl Button {
             debug("fin de déplacement manquée : rattrapée");
             MOVING.store(false, Ordering::SeqCst);
         }
-        let Some(gear) = self.locator.settings(self.claude) else {
-            self.hide("bouton Paramètres de Claude introuvable (barre latérale repliée ?)");
+        let Some((gear, spot)) = self.locator.settings(self.claude) else {
+            self.hide("sélecteur Claude / Code et bouton Paramètres introuvables (barre latérale repliée ?)");
             return;
         };
-        let size = gear.bottom - gear.top;
+        // Le sélecteur est un peu moins haut que les boutons de la barre du haut (26 contre 28) :
+        // le puzzle prend leur taille, centré sur lui.
+        let (size, top) = match spot {
+            Spot::Mode => (gear.bottom - gear.top + 2, gear.top - 1),
+            Spot::Settings => (gear.bottom - gear.top, gear.top),
+        };
         if size != self.size {
             self.size = size;
             render(self.hwnd, size, self.is_hover);
@@ -323,7 +360,7 @@ impl Button {
             return;
         }
         let gap = (size as f32 / 7.0).round() as i32;
-        let (x, y) = (gear.left - size - gap, gear.top);
+        let (x, y) = (gear.left - size - gap, top);
         // Bouton Paramètres qui bouge souris enfoncée : la barre latérale est redimensionnée. Le
         // suivre par à-coups (UI Automation, ~100 ms) est saccadé : caché jusqu'au lâcher.
         let mouse_down = unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } as u16 & 0x8000 != 0;
